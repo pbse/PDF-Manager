@@ -1,0 +1,30 @@
+[package]
+name = "pdf-manager"
+version = "1.0.0"
+description = "Efficient cross-platform PDF manager built with Rust and Tauri."
+authors = ["Prashant Bansal"]
+edition = "2021"
+
+[lib]
+name = "pdf_manager"
+path = "src/lib.rs"
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[[bin]]
+name = "pdf-manager"
+path = "src/main.rs"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["sync"] }
+serde_json = "1.0"
+lopdf = "0.34.0"
+notify-rust = "=4.5.10"
+tauri-plugin-shell = "2.0.0-beta.3" # Use matching beta version
+tauri-plugin-dialog = "2.0.0-beta.3" # Use matching beta version
+tauri-plugin-os = "2.0.0-beta.2" # Use matching beta version
+tauri-plugin-opener = "2.0.0-beta.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

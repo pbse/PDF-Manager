@@ -1,0 +1,606 @@
+// Necessary imports
+use lopdf::{dictionary, Document, Error as LopdfError, Object, ObjectId};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs;
+use std::path::Path;
+
+/// Recursively copies objects and their dependencies from source_doc to target_doc.
+fn manual_deep_copy(
+    source_doc: &Document,
+    target_doc: &mut Document,
+    ids_to_copy: &[ObjectId],
+) -> Result<HashMap<ObjectId, ObjectId>, LopdfError> {
+    let mut id_map: HashMap<ObjectId, ObjectId> = HashMap::new();
+    let mut queue: VecDeque<ObjectId> = ids_to_copy.iter().cloned().collect();
+    let mut processed: HashSet<ObjectId> = ids_to_copy.iter().cloned().collect();
+    let mut loop_count = 0;
+    let max_loops = (source_doc.objects.len() + ids_to_copy.len()) * 2;
+
+    while let Some(old_id) = queue.pop_front() {
+        loop_count += 1;
+        if loop_count > max_loops {
+            return Err(LopdfError::Syntax(format!(
+                "Deep copy loop exceeded limit ({})",
+                max_loops
+            )));
+        }
+        if id_map.contains_key(&old_id) {
+            continue;
+        }
+
+        let source_object = match source_doc.get_object(old_id) {
+            Ok(obj) => obj,
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to get source object {:?} during deep copy: {}. Skipping.",
+                    old_id, e
+                );
+                continue;
+            }
+        };
+
+        // Find references in the original object FIRST
+        find_references_recursive(source_object, &mut queue, &mut processed)?;
+
+        let cloned_object = source_object.clone();
+        let new_id = target_doc.add_object(cloned_object);
+        id_map.insert(old_id, new_id);
+    }
+
+    // --- Second Pass: Update references ---
+    for (_old_id, new_id) in &id_map {
+        match target_doc.get_object_mut(*new_id) {
+            Ok(target_object) => {
+                update_references_recursive(target_object, &id_map)?; // Propagate error if update fails
+            }
+            Err(e) => {
+                // Fail hard if a mapped object can't be retrieved for update
+                eprintln!(
+                    "ERROR: Could not get mapped object {:?} for ref update (Pass 2): {}",
+                    new_id, e
+                );
+                return Err(LopdfError::Syntax(format!(
+                    "Failed to retrieve copied object {:?} during reference update",
+                    new_id
+                )));
+            }
+        }
+    }
+    Ok(id_map)
+}
+
+/// Helper to find Object::Reference IDs within an object.
+fn find_references_recursive(
+    object: &Object,
+    queue: &mut VecDeque<ObjectId>,
+    processed: &mut HashSet<ObjectId>,
+) -> Result<(), LopdfError> {
+    match object {
+        Object::Reference(id) => {
+            if processed.insert(*id) {
+                queue.push_back(*id);
+            }
+        }
+        Object::Array(arr) => {
+            for item in arr {
+                find_references_recursive(item, queue, processed)?;
+            }
+        }
+        Object::Dictionary(dict) => {
+            for (_, value) in dict.iter() {
+                find_references_recursive(value, queue, processed)?;
+            }
+        }
+        Object::Stream(stream) => {
+            for (_, value) in stream.dict.iter() {
+                find_references_recursive(value, queue, processed)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Helper to update Object::Reference IDs within a mutable object.
+fn update_references_recursive(
+    object: &mut Object,
+    id_map: &HashMap<ObjectId, ObjectId>,
+) -> Result<(), LopdfError> {
+    match object {
+        Object::Reference(ref mut old_id_ref) => {
+            if let Some(new_id) = id_map.get(old_id_ref) {
+                *old_id_ref = *new_id;
+            }
+        }
+        Object::Array(arr) => {
+            // Use iter_mut() to modify elements
+            for item in arr.iter_mut() {
+                update_references_recursive(item, id_map)?;
+            }
+        }
+        Object::Dictionary(dict) => {
+            // Use iter_mut()
+            for (_, value) in dict.iter_mut() {
+                update_references_recursive(value, id_map)?;
+            }
+        }
+        Object::Stream(stream) => {
+            // Use iter_mut()
+            for (_, value) in stream.dict.iter_mut() {
+                update_references_recursive(value, id_map)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+// --- split_pdf Function using Manual Deep Copy ---
+#[tauri::command]
+pub fn split_pdf(path: &str, pages: Vec<u32>, output_path: &str) -> Result<(), String> {
+    // --- Input Validation & Dir Creation ---
+    if pages.is_empty() {
+        return Err("The list of pages to extract cannot be empty.".to_string());
+    }
+    let input_path = Path::new(path);
+    if !input_path.exists() {
+        return Err(format!("Input file not found: {}", path));
+    }
+    if !input_path.is_file() {
+        return Err(format!("Input path is not a file: {}", path));
+    }
+    if let Some(parent_dir) = Path::new(output_path).parent() {
+        if !parent_dir.exists() {
+            fs::create_dir_all(parent_dir).map_err(|e| {
+                format!(
+                    "Failed to create output directory '{}': {}",
+                    parent_dir.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    // --- Load Original Document ---
+    let doc = Document::load(path).map_err(|e| format!("Failed to load PDF '{}': {}", path, e))?;
+
+    // --- Prepare New Document ---
+    let mut new_doc = Document::with_version(doc.version.clone());
+    let new_pages_id = new_doc.new_object_id(); // Placeholder for the new Pages node
+    let new_catalog_id = new_doc.new_object_id(); // Placeholder for the new Catalog node
+
+    // --- Identify Page Object IDs to Copy ---
+    let source_pages_map = doc.get_pages();
+    let mut page_ids_to_copy = Vec::with_capacity(pages.len());
+    for &page_num in &pages {
+        if page_num == 0 {
+            return Err(format!(
+                "Invalid page number: {}. Page numbers must be 1-based.",
+                page_num
+            ));
+        }
+        match source_pages_map.get(&page_num) {
+            Some(&page_id) => page_ids_to_copy.push(page_id),
+            None => {
+                return Err(format!(
+                    "Page number {} not found in document '{}' (which has {} pages).",
+                    page_num,
+                    path,
+                    source_pages_map.len()
+                ))
+            }
+        }
+    }
+
+    // --- Perform Manual Deep Copy for all selected pages ---
+    // Map potential LopdfError from deep copy to String
+    let object_map = manual_deep_copy(&doc, &mut new_doc, &page_ids_to_copy).map_err(|e| {
+        format!(
+            "Failed to deep copy pages {:?} from '{}': {}",
+            pages, path, e
+        )
+    })?;
+
+    // --- Build the 'Kids' array and Update Parent Pointers ---
+    let mut new_kids = Vec::with_capacity(pages.len());
+    for old_page_id in &page_ids_to_copy {
+        // Find the corresponding new ObjectId using the map
+        let new_page_id = *object_map.get(old_page_id).ok_or_else(|| {
+            format!(
+                "Internal error: Copied page ObjectId {:?} not found in mapping.",
+                old_page_id
+            )
+        })?;
+
+        new_kids.push(Object::Reference(new_page_id)); // Add ref to new page ID to Kids
+
+        // Update the Parent reference in the copied page object
+        // Use a block to limit the mutable borrow
+        {
+            let page_obj = new_doc.get_object_mut(new_page_id).map_err(|e| {
+                format!(
+                    "Failed to retrieve copied page object {:?} to update Parent: {}",
+                    new_page_id, e
+                )
+            })?;
+
+            let page_dict = page_obj.as_dict_mut().map_err(|_| {
+                format!(
+                    "Internal error: Copied page object {:?} is not a dictionary.",
+                    new_page_id
+                )
+            })?;
+
+            page_dict.set("Parent", Object::Reference(new_pages_id)); // Point to the new Pages node ID
+        } // Mutable borrow ends here
+    }
+
+    // --- Finalize New Document Structure ---
+    new_doc.objects.insert(
+        new_pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages",
+            "Kids" => Object::Array(new_kids), // Use the collected new page references
+            "Count" => Object::Integer(pages.len() as i64), // Count is the number of extracted pages
+        }),
+    );
+    new_doc.objects.insert(
+        new_catalog_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => Object::Reference(new_pages_id), // Reference the new Pages node
+        }),
+    );
+    new_doc
+        .trailer
+        .set("Root", Object::Reference(new_catalog_id));
+
+    // --- Compress and Save ---
+    new_doc.compress();
+    new_doc
+        .save(output_path)
+        .map_err(|e| format!("Failed to save split PDF to '{}': {}", output_path, e))?;
+
+    Ok(())
+}
+
+// --- Tests ---
+#[cfg(test)]
+mod tests {
+    use super::*; // Imports split_pdf and its helpers if defined in parent mod
+    use lopdf::{dictionary, Document, Object, Stream}; // Ensure necessary types are imported
+    use std::fs;
+    use std::io::Write; // For non-pdf test
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // --- RAII Guard for Test Environment ---
+    struct TestEnvironment {
+        base_name: String,
+        run_id: usize,
+        test_dir: PathBuf,
+        output_dir: PathBuf,
+        // Store the primary input path created by setup
+        input_pdf_path: PathBuf,
+    }
+
+    // Counter for unique test run IDs
+    static TEST_RUN_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    impl TestEnvironment {
+        fn new(test_name: &str) -> Self {
+            let run_id = TEST_RUN_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let unique_suffix = format!("{}_{}", test_name, run_id);
+
+            // Place artifacts in target/ directory
+            let test_dir = PathBuf::from("target/test_data_splitter").join(&unique_suffix);
+            let output_dir = PathBuf::from("target/test_output_splitter").join(&unique_suffix);
+
+            // Clean up potential remnants from previous runs of THIS specific test
+            if test_dir.exists() {
+                fs::remove_dir_all(&test_dir).ok();
+            }
+            if output_dir.exists() {
+                fs::remove_dir_all(&output_dir).ok();
+            }
+
+            // Create fresh dirs
+            fs::create_dir_all(&test_dir).expect("Failed to create unique test data directory");
+            fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
+
+            // Define and create the primary input PDF
+            let input_pdf_path = test_dir.join("sample.pdf");
+            // Use the fixed create_minimal_pdf helper
+            create_minimal_pdf(input_pdf_path.to_str().unwrap(), 3, "Sample")
+                .expect("Setup: Failed to create dummy sample PDF");
+            assert!(
+                input_pdf_path.exists(),
+                "Setup: Dummy PDF does not exist after creation!"
+            );
+
+            TestEnvironment {
+                base_name: test_name.to_string(),
+                run_id,
+                test_dir,
+                output_dir,
+                input_pdf_path,
+            }
+        }
+
+        // Helper to get the full path for an output file
+        fn output_path(&self, filename: &str) -> PathBuf {
+            self.output_dir.join(filename)
+        }
+
+        // Helper to get the primary input path as str
+        fn input_path_str(&self) -> &str {
+            self.input_pdf_path.to_str().unwrap()
+        }
+    }
+
+    // Implement Drop for automatic cleanup
+    impl Drop for TestEnvironment {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.test_dir).ok();
+            fs::remove_dir_all(&self.output_dir).ok();
+            // println!("Cleaned up splitter env: {} {}", self.base_name, self.run_id);
+        }
+    }
+
+    // --- Minimal PDF Creation Helper (Corrected for lopdf 0.31.0) ---
+    fn create_minimal_pdf(
+        file_path: &str,
+        num_pages: u32,
+        text_prefix: &str,
+    ) -> std::io::Result<()> {
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let font_id = doc.add_object(
+            dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", },
+        );
+        let resources_id = doc.add_object(
+            dictionary! { "Font" => dictionary! { "F1" => Object::Reference(font_id) }, },
+        );
+
+        let mut kids = vec![];
+        for i in 1..=num_pages {
+            let content_str = format!("BT /F1 12 Tf 100 700 Td ({}-Page {}) Tj ET", text_prefix, i);
+            let content_stream = Stream::new(dictionary! {}, content_str.into_bytes());
+            let content_id = doc.add_object(content_stream);
+
+            let page_dict = dictionary! {
+                "Type" => "Page",
+                "Parent" => Object::Reference(pages_id),
+                "MediaBox" => Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]),
+                "Contents" => Object::Reference(content_id),
+                "Resources" => Object::Reference(resources_id),
+            };
+            // Pass Object::Dictionary to add_object
+            let page_id = doc.add_object(Object::Dictionary(page_dict));
+            kids.push(Object::Reference(page_id));
+        }
+
+        // Use Object::Integer(num as i64)
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => Object::Array(kids),
+                "Count" => Object::Integer(num_pages as i64), // Corrected
+            }),
+        );
+
+        let catalog_id = doc.add_object(
+            dictionary! { "Type" => "Catalog", "Pages" => Object::Reference(pages_id), },
+        );
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+
+        doc.save(file_path)?;
+        Ok(())
+    }
+
+    // --- Updated Tests ---
+
+    #[test]
+    fn test_split_pdf_success() {
+        let env = TestEnvironment::new("split_success"); // RAII setup/teardown
+        let output_path = env.output_path("split_1_3.pdf");
+        let pages_to_extract = vec![1, 3];
+
+        let result = split_pdf(
+            env.input_path_str(),
+            pages_to_extract.clone(),
+            output_path.to_str().unwrap(),
+        );
+
+        assert!(result.is_ok(), "split_pdf failed: {:?}", result.err());
+        assert!(
+            output_path.exists(),
+            "Output file was not created at {}",
+            output_path.display()
+        );
+
+        match Document::load(&output_path) {
+            Ok(output_doc) => {
+                assert_eq!(
+                    output_doc.get_pages().len(),
+                    pages_to_extract.len(),
+                    "Output PDF page count mismatch."
+                );
+                let output_pages = output_doc.get_pages();
+                // Check keys representing the *new* page numbers in the output doc
+                assert!(output_pages.contains_key(&1), "Page 1 missing in output");
+                assert!(
+                    output_pages.contains_key(&2),
+                    "Page 2 (original 3) missing in output"
+                );
+            }
+            Err(e) => panic!(
+                "Failed to load the generated output PDF '{}': {}",
+                output_path.display(),
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_split_pdf_invalid_page() {
+        let env = TestEnvironment::new("split_invalid_page");
+        let output_path = env.output_path("split_invalid.pdf");
+        let pages_to_extract = vec![1, 5]; // Page 5 invalid for a 3-page doc
+
+        let result = split_pdf(
+            env.input_path_str(),
+            pages_to_extract,
+            output_path.to_str().unwrap(),
+        );
+
+        assert!(
+            result.is_err(),
+            "Function should fail for out-of-bounds page"
+        );
+        if let Err(e) = result {
+            println!("Expected error: {}", e);
+            assert!(
+                e.contains("Page number 5 not found"),
+                "Error message mismatch"
+            );
+        }
+        assert!(
+            !output_path.exists() || Document::load(&output_path).is_err(),
+            "Output file should ideally not exist or be invalid after an error."
+        );
+    }
+
+    #[test]
+    fn test_split_pdf_empty_pages() {
+        let env = TestEnvironment::new("split_empty_pages");
+        let output_path = env.output_path("split_empty.pdf");
+        let pages_to_extract = vec![];
+
+        let result = split_pdf(
+            env.input_path_str(),
+            pages_to_extract,
+            output_path.to_str().unwrap(),
+        );
+
+        assert!(result.is_err(), "Function should fail for empty pages list");
+        if let Err(e) = result {
+            println!("Expected error: {}", e);
+            assert!(e.contains("cannot be empty"), "Error message mismatch");
+        }
+        assert!(
+            !output_path.exists() || Document::load(&output_path).is_err(),
+            "Output file should ideally not exist or be invalid after an error."
+        );
+    }
+
+    #[test]
+    fn test_split_pdf_input_not_found() {
+        // Don't need full env, just a guaranteed non-existent path
+        let bad_input_path = "target/test_data_splitter/non_existent_dir/no_way_this_exists.pdf";
+        fs::remove_file(bad_input_path).ok();
+        if let Some(parent) = Path::new(bad_input_path).parent() {
+            fs::remove_dir_all(parent).ok();
+        }
+
+        let output_path = "target/test_output_splitter/output_for_bad_input_split.pdf";
+        // Ensure output dir exists so function doesn't fail on *that*
+        if let Some(parent) = Path::new(output_path).parent() {
+            fs::create_dir_all(parent).ok();
+        }
+
+        let pages_to_extract = vec![1];
+        let result = split_pdf(bad_input_path, pages_to_extract, output_path);
+
+        assert!(
+            result.is_err(),
+            "Function should fail if input file not found"
+        );
+        if let Err(e) = result {
+            println!("Expected error: {}", e);
+            // Check for the error coming from the initial exists() check OR Document::load
+            assert!(
+                e.contains("Input file not found")
+                    || (e.contains("Failed to load PDF") && e.contains("No such file")),
+                "Error message mismatch"
+            );
+        }
+
+        // Clean up output dir if created
+        if let Some(parent) = Path::new(output_path).parent() {
+            fs::remove_dir_all(parent).ok();
+        }
+    }
+
+    #[test]
+    fn test_split_pdf_zero_page() {
+        let env = TestEnvironment::new("split_page_zero");
+        let output_path = env.output_path("split_zero.pdf");
+        let pages_to_extract = vec![0, 1]; // Page 0 is invalid
+
+        let result = split_pdf(
+            env.input_path_str(),
+            pages_to_extract,
+            output_path.to_str().unwrap(),
+        );
+
+        assert!(result.is_err(), "Function should fail for page zero");
+        if let Err(e) = result {
+            println!("Expected error: {}", e);
+            assert!(
+                e.contains("Page numbers must be 1-based") || e.contains("Invalid page number: 0"),
+                "Error message mismatch"
+            );
+        }
+        assert!(
+            !output_path.exists() || Document::load(&output_path).is_err(),
+            "Output file should ideally not exist or be invalid after an error."
+        );
+        // Clean up output dir if created
+        if let Some(parent) = Path::new(&output_path).parent() {
+            fs::remove_dir_all(parent).ok();
+        }
+    }
+
+    #[test]
+    fn test_split_pdf_input_not_a_pdf() {
+        let env = TestEnvironment::new("split_not_a_pdf");
+        let not_pdf_path = env.test_dir.join("not_a_pdf.txt");
+        let output_path = env.output_path("output_for_not_pdf_split.pdf");
+
+        let mut file = fs::File::create(&not_pdf_path).expect("Failed to create dummy text file");
+        writeln!(file, "This is text.").expect("Failed to write to text file");
+        assert!(not_pdf_path.exists());
+
+        let pages_to_extract = vec![1];
+        let result = split_pdf(
+            not_pdf_path.to_str().unwrap(),
+            pages_to_extract,
+            output_path.to_str().unwrap(),
+        );
+
+        assert!(
+            result.is_err(),
+            "Function should fail if input is not a PDF"
+        );
+        if let Err(e) = result {
+            println!("Expected error: {}", e);
+            assert!(
+                e.contains("Failed to load PDF")
+                    || e.contains("invalid PDF header")
+                    || e.contains("cannot find trailer"),
+                "Error message mismatch"
+            );
+        }
+        assert!(
+            !output_path.exists() || Document::load(&output_path).is_err(),
+            "Output file should ideally not exist or be invalid after an error."
+        );
+        // Clean up output dir if created
+        if let Some(parent) = Path::new(&output_path).parent() {
+            fs::remove_dir_all(parent).ok();
+        }
+    }
+}
