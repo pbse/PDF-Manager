@@ -54,12 +54,10 @@ mod tests {
     use super::*;
     use lopdf::{dictionary, Document, Object, Stream};
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct TestEnvironment {
-        base_name: String,
-        run_id: usize,
         test_dir: PathBuf,
         output_dir: PathBuf,
         input_pdf_path: PathBuf,
@@ -69,8 +67,7 @@ mod tests {
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
-            let run_id = TEST_RUN_COUNTER.fetch_add(1, Ordering::SeqCst);
-            let unique_suffix = format!("{}_{}", test_name, run_id);
+            let unique_suffix = format!("{}", test_name);
 
             let test_dir = PathBuf::from("target/test_data_remover").join(&unique_suffix);
             let output_dir = PathBuf::from("target/test_output_remover").join(&unique_suffix);
@@ -94,8 +91,6 @@ mod tests {
             );
 
             TestEnvironment {
-                base_name: test_name.to_string(),
-                run_id,
                 test_dir,
                 output_dir,
                 input_pdf_path,

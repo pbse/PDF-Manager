@@ -90,8 +90,6 @@ mod tests {
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
-        base_name: String,
-        run_id: usize,
         test_dir: PathBuf,
         // Output dir might not be strictly needed for parser, but keep pattern consistent
         output_dir: PathBuf,
@@ -123,8 +121,6 @@ mod tests {
             fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
 
             TestEnvironment {
-                base_name: test_name.to_string(),
-                run_id,
                 test_dir,
                 output_dir,
             }
