@@ -3,17 +3,20 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 fn decode_pdf_string(bytes: &[u8]) -> String {
-    if bytes.starts_with(&[0xFE, 0xFF]) && bytes.len() >= 4 && bytes.len() % 2 == 0 {
+    if bytes.starts_with(&[0xFE, 0xFF]) {
         // UTF-16BE with BOM
-        let utf16_data: Vec<u16> = bytes[2..] // Skip BOM
+        let utf16_data: Vec<u16> = bytes[2..]
             .chunks_exact(2)
             .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
             .collect();
-        String::from_utf16(&utf16_data).unwrap_or_else(|_| String::from_utf8_lossy(bytes).into())
+        String::from_utf16(&utf16_data).unwrap_or_else(|_| decode_pdfdoc_encoding(bytes))
     } else {
-        // Default to UTF-8 lossy conversion
-        String::from_utf8_lossy(bytes).into()
+        decode_pdfdoc_encoding(bytes)
     }
+}
+
+fn decode_pdfdoc_encoding(bytes: &[u8]) -> String {
+    bytes.iter().map(|&byte| byte as char).collect()
 }
 
 #[tauri::command]

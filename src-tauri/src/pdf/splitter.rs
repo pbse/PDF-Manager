@@ -1,139 +1,7 @@
-// Necessary imports
-use lopdf::{dictionary, Document, Error as LopdfError, Object, ObjectId};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::pdf::utils::manual_deep_copy;
+use lopdf::{dictionary, Document, Object, ObjectId};
 use std::fs;
 use std::path::Path;
-
-/// Recursively copies objects and their dependencies from source_doc to target_doc.
-fn manual_deep_copy(
-    source_doc: &Document,
-    target_doc: &mut Document,
-    ids_to_copy: &[ObjectId],
-) -> Result<HashMap<ObjectId, ObjectId>, LopdfError> {
-    let mut id_map: HashMap<ObjectId, ObjectId> = HashMap::new();
-    let mut queue: VecDeque<ObjectId> = ids_to_copy.iter().cloned().collect();
-    let mut processed: HashSet<ObjectId> = ids_to_copy.iter().cloned().collect();
-    let mut loop_count = 0;
-    let max_loops = (source_doc.objects.len() + ids_to_copy.len()) * 2;
-
-    while let Some(old_id) = queue.pop_front() {
-        loop_count += 1;
-        if loop_count > max_loops {
-            return Err(LopdfError::Syntax(format!(
-                "Deep copy loop exceeded limit ({})",
-                max_loops
-            )));
-        }
-        if id_map.contains_key(&old_id) {
-            continue;
-        }
-
-        let source_object = match source_doc.get_object(old_id) {
-            Ok(obj) => obj,
-            Err(e) => {
-                eprintln!(
-                    "Warning: Failed to get source object {:?} during deep copy: {}. Skipping.",
-                    old_id, e
-                );
-                continue;
-            }
-        };
-
-        // Find references in the original object FIRST
-        find_references_recursive(source_object, &mut queue, &mut processed)?;
-
-        let cloned_object = source_object.clone();
-        let new_id = target_doc.add_object(cloned_object);
-        id_map.insert(old_id, new_id);
-    }
-
-    // --- Second Pass: Update references ---
-    for (_old_id, new_id) in &id_map {
-        match target_doc.get_object_mut(*new_id) {
-            Ok(target_object) => {
-                update_references_recursive(target_object, &id_map)?; // Propagate error if update fails
-            }
-            Err(e) => {
-                // Fail hard if a mapped object can't be retrieved for update
-                eprintln!(
-                    "ERROR: Could not get mapped object {:?} for ref update (Pass 2): {}",
-                    new_id, e
-                );
-                return Err(LopdfError::Syntax(format!(
-                    "Failed to retrieve copied object {:?} during reference update",
-                    new_id
-                )));
-            }
-        }
-    }
-    Ok(id_map)
-}
-
-/// Helper to find Object::Reference IDs within an object.
-fn find_references_recursive(
-    object: &Object,
-    queue: &mut VecDeque<ObjectId>,
-    processed: &mut HashSet<ObjectId>,
-) -> Result<(), LopdfError> {
-    match object {
-        Object::Reference(id) => {
-            if processed.insert(*id) {
-                queue.push_back(*id);
-            }
-        }
-        Object::Array(arr) => {
-            for item in arr {
-                find_references_recursive(item, queue, processed)?;
-            }
-        }
-        Object::Dictionary(dict) => {
-            for (_, value) in dict.iter() {
-                find_references_recursive(value, queue, processed)?;
-            }
-        }
-        Object::Stream(stream) => {
-            for (_, value) in stream.dict.iter() {
-                find_references_recursive(value, queue, processed)?;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-/// Helper to update Object::Reference IDs within a mutable object.
-fn update_references_recursive(
-    object: &mut Object,
-    id_map: &HashMap<ObjectId, ObjectId>,
-) -> Result<(), LopdfError> {
-    match object {
-        Object::Reference(ref mut old_id_ref) => {
-            if let Some(new_id) = id_map.get(old_id_ref) {
-                *old_id_ref = *new_id;
-            }
-        }
-        Object::Array(arr) => {
-            // Use iter_mut() to modify elements
-            for item in arr.iter_mut() {
-                update_references_recursive(item, id_map)?;
-            }
-        }
-        Object::Dictionary(dict) => {
-            // Use iter_mut()
-            for (_, value) in dict.iter_mut() {
-                update_references_recursive(value, id_map)?;
-            }
-        }
-        Object::Stream(stream) => {
-            // Use iter_mut()
-            for (_, value) in stream.dict.iter_mut() {
-                update_references_recursive(value, id_map)?;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
 
 // --- split_pdf Function using Manual Deep Copy ---
 #[tauri::command]
@@ -565,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_pdf_input_not_a_pdf() {
+    fn test_split_input_not_a_pdf() {
         let env = TestEnvironment::new("split_not_a_pdf");
         let not_pdf_path = env.test_dir.join("not_a_pdf.txt");
         let output_path = env.output_path("output_for_not_pdf_split.pdf");

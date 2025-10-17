@@ -49,18 +49,16 @@ pub async fn open_file_dialog(
         Ok(Some(paths)) => {
             // Callback sent Some(Vec<FilePath>)
             // Process the Vec<FilePath>
-            Ok(paths
+            paths
                 .into_iter()
-                .filter_map(|file_path| {
-                    // Use filter_map to handle potential non-Path variants
+                .map(|file_path| {
                     if let FilePath::Path(p) = file_path {
-                        Some(p.to_string_lossy().into_owned())
+                        Ok(p.to_string_lossy().into_owned())
                     } else {
-                        eprintln!("Received non-path FilePath variant: {:?}", file_path);
-                        None // Skip non-path variants if they occur
+                        Err("Received non-path FilePath variant".to_string())
                     }
                 })
-                .collect())
+                .collect::<Result<Vec<String>, String>>()
         }
         Ok(None) => Ok(vec![]), // Callback sent None (User cancelled)
         Err(e) => Err(format!("Failed to receive dialog result: {}", e)), // Error receiving from channel
@@ -97,11 +95,7 @@ pub async fn save_file_dialog(
             if let FilePath::Path(p) = file_path {
                 Ok(Some(p.to_string_lossy().into_owned()))
             } else {
-                eprintln!(
-                    "Received non-path FilePath variant on save: {:?}",
-                    file_path
-                );
-                Ok(None) // Treat unexpected variant as cancellation/failure
+                Err("Received non-path FilePath variant on save".to_string())
             }
         }
         Ok(None) => Ok(None), // Callback sent None (User cancelled)

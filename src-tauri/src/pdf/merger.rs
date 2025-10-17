@@ -60,8 +60,7 @@ fn merge_and_shift_objects(
     for (_old_id, new_id) in &id_map {
         match target_doc.objects.get_mut(new_id) {
             Some(target_object) => {
-                // Pass the *new* ID for context if needed, and target pages ID
-                update_references_recursive_merge(target_object, &id_map, *new_id, target_pages_id)?;
+                update_references_recursive_merge(target_object, &id_map, target_pages_id)?;
             }
             None => { // Changed from get_object_mut(...).is_err() check
                 // This indicates an object that *was* mapped couldn't be retrieved. Critical.
@@ -95,7 +94,6 @@ fn find_references_recursive_merge(
 fn update_references_recursive_merge(
     object: &mut Object,
     id_map: &HashMap<ObjectId, ObjectId>,
-    _current_obj_new_id: ObjectId, // Renamed to indicate potentially unused
     target_pages_id: ObjectId,
 ) -> Result<(), LopdfError> {
      match object {
@@ -105,8 +103,7 @@ fn update_references_recursive_merge(
         Object::Array(arr) => {
             // *** FIXED: Use iter_mut() ***
             for item in arr.iter_mut() {
-                // Pass item down - new id context not strictly needed here
-                update_references_recursive_merge(item, id_map, _current_obj_new_id, target_pages_id)?;
+                update_references_recursive_merge(item, id_map, target_pages_id)?;
             }
         }
         Object::Dictionary(dict) => {
@@ -119,7 +116,7 @@ fn update_references_recursive_merge(
             // Use iter_mut()
             for (key, value) in dict.iter_mut() {
                 if !(is_page && key == b"Parent".as_ref()) {
-                    update_references_recursive_merge(value, id_map, _current_obj_new_id, target_pages_id)?;
+                    update_references_recursive_merge(value, id_map, target_pages_id)?;
                 }
             }
         }
@@ -133,7 +130,7 @@ fn update_references_recursive_merge(
              // Use iter_mut()
              for (key, value) in stream.dict.iter_mut() {
                  if !(is_page_stream_dict && key == b"Parent".as_ref()) {
-                    update_references_recursive_merge(value, id_map, _current_obj_new_id, target_pages_id)?;
+                    update_references_recursive_merge(value, id_map, target_pages_id)?;
                  }
             }
         }
@@ -214,15 +211,7 @@ pub fn merge_pdfs(paths: Vec<&str>, output_path: &str) -> Result<(), String> {
          .as_reference()
          .map_err(|e| format!("Root Pages entry is not a reference in '{}': {}", first_path, e))?;
 
-    // --- Prepare for Merging: Get Initial Count ---
-    let initial_page_count: i64;
-    { // Scope immutable borrow
-        let pages_dict = target_doc.get_object(target_pages_id)
-            .map_err(|e| format!("Failed to get initial Pages object {:?}: {}", target_pages_id, e))?
-            .as_dict()
-            .map_err(|_| format!("Initial Pages object {:?} is not a dictionary", target_pages_id))?;
-        initial_page_count = pages_dict.get(b"Count").ok().and_then(|obj| obj.as_i64().ok()).unwrap_or(0);
-    }
+    
 
     // --- Iterate and Merge Remaining Documents ---
     let mut new_kids_data = Vec::new(); // Collect new page references here
@@ -262,18 +251,28 @@ pub fn merge_pdfs(paths: Vec<&str>, output_path: &str) -> Result<(), String> {
     target_doc.max_id = current_max_id;
 
     { // Scope the final mutable borrow of the Pages dictionary
-        // --- FIX: Map error *before* using '?' ---
-        let pages_dict_mut = target_doc.get_object_mut(target_pages_id)
-            .map_err(|e| format!("Failed to get mutable Pages object {:?} for final update: {}", target_pages_id, e))? // Apply '?' AFTER map_err
+        let pages_dict_mut = target_doc
+            .get_object_mut(target_pages_id)
+            .map_err(|e| {
+                format!(
+                    "Failed to get mutable Pages object {:?} for final update: {}",
+                    target_pages_id, e
+                )
+            })?
             .as_dict_mut()
-            .map_err(|_| format!("Final Pages object {:?} is not a dictionary", target_pages_id))?; // Keep this map_err
+            .map_err(|_| {
+                format!(
+                    "Final Pages object {:?} is not a dictionary",
+                    target_pages_id
+                )
+            })?;
 
         // Get the mutable kids array
-        // --- FIX: Map error *before* using '?' ---
-        let kids_array = pages_dict_mut.get_mut(b"Kids")
-            .map_err(|e| format!("Failed to get mutable Kids entry for final update: {}", e))? // Apply '?' AFTER map_err
+        let kids_array = pages_dict_mut
+            .get_mut(b"Kids")
+            .map_err(|e| format!("Failed to get mutable Kids entry for final update: {}", e))?
             .as_array_mut()
-            .map_err(|_| "Final Pages Kids object is not an array".to_string())?; // Keep this map_err
+            .map_err(|_| "Final Pages Kids object is not an array".to_string())?;
 
         // Extend with the collected new page references (no clone needed)
         kids_array.extend(new_kids_data);

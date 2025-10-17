@@ -7,7 +7,7 @@ mod commands;
 mod pdf;
 
 // Use the re-exported functions directly from the 'pdf' module
-use crate::pdf::{extract_pdf_page, merge_pdfs, parse_pdf, split_pdf};
+use crate::pdf::{extract_pdf_page, merge_pdfs, parse_pdf, split_pdf, rotate_pdf, delete_pages};
 
 fn main() {
     tauri::Builder::default()
@@ -35,6 +35,8 @@ fn main() {
             merge_pdfs,
             split_pdf,
             extract_pdf_page,
+            rotate_pdf,
+            delete_pages,
             commands::open_file_dialog,
             commands::save_file_dialog,
             commands::get_os_type,
