@@ -69,7 +69,7 @@ mod tests {
     use lopdf::{dictionary, Document, Object, Stream};
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::AtomicUsize;
 
     struct TestEnvironment {
         test_dir: PathBuf,

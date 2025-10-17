@@ -151,7 +151,6 @@ mod tests {
     use std::fs;
     use std::io::Write; // For creating non-pdf file test
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
@@ -160,9 +159,6 @@ mod tests {
         // Store the primary input path created by setup
         input_pdf_path: PathBuf,
     }
-
-    // Counter for unique test run IDs
-    static TEST_RUN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {

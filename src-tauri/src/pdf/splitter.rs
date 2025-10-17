@@ -140,7 +140,7 @@ mod tests {
     use std::fs;
     use std::io::Write; // For non-pdf test
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::AtomicUsize;
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
