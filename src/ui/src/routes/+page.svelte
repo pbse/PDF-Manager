@@ -8,19 +8,18 @@
   import { isLoading, showStatus, startLoading } from "$lib/stores";
 
   // --- Reactive State ---
+  type SelectionTarget = "parse" | "split" | "extract" | "rotate" | "delete";
+
   let selectedParseFile: string | null = null;
-  let parseResult: Record<string, string> | null = null;
-
-  let selectedMergeFiles: string[] = [];
-
   let selectedSplitFile: string | null = null;
-  let splitPagesInput: string = ""; // e.g., "1, 3-5, 8"
-
   let selectedExtractFile: string | null = null;
-  let extractPageInput: number | null = null;
   let selectedRotateFile: string | null = null;
-  let rotatePagesInput: string = "";
   let selectedDeleteFile: string | null = null;
+  let parseResult: Record<string, string> | null = null;
+  let selectedMergeFiles: string[] = [];
+  let splitPagesInput: string = ""; // e.g., "1, 3-5, 8"
+  let extractPageInput: number | null = null;
+  let rotatePagesInput: string = "";
   let deletePagesInput: string = "";
 
   // --- Helper functions using invoke (wrap native functionality) ---
@@ -40,46 +39,42 @@
     return await invoke("save_file_dialog", { defaultPath });
   }
 
-  async function getOsType(): Promise<string> {
-    // Implement this command in Rust (for example, by calling std::env or tauri::api::os::)
-    return await invoke("get_os_type");
-  }
-
   async function shellOpen(filePath: string): Promise<void> {
     // Implement a Rust command (e.g. `shell_open`) that uses Tauri’s shell open functionality
     await invoke("shell_open", { filePath });
   }
 
-  async function openPathInExplorer(filePath: string) {
+  async function openPathInExplorer(filePath: string): Promise<void> {
     try {
-      const osType = await getOsType();
-      if (osType === "Darwin" || osType === "Linux") {
-        await shellOpen(filePath);
-      } else {
-        // On Windows, open the parent directory
-        const parentDir = filePath.split("/").slice(0, -1).join("/");
-        await shellOpen(parentDir);
-      }
+      await shellOpen(filePath);
     } catch (err) {
-      console.error("Failed to open path:", err);
-      showStatus(
-        `Processing complete. Could not automatically open ${filePath}.`,
-        false,
-      );
+      showStatus(`Error opening file: ${err}`, true);
     }
   }
 
   // --- Event Handlers ---
 
-  async function selectFile(target: "parse" | "split" | "extract" | "rotate" | "delete") {
+  async function selectFile(target: SelectionTarget) {
     try {
       const result = await openFileDialog(false);
       if (result && typeof result === "string") {
-        if (target === "parse") selectedParseFile = result;
-        if (target === "split") selectedSplitFile = result;
-        if (target === "extract") selectedExtractFile = result;
-        if (target === "rotate") selectedRotateFile = result;
-        if (target === "delete") selectedDeleteFile = result;
+        switch (target) {
+          case "parse":
+            selectedParseFile = result;
+            break;
+          case "split":
+            selectedSplitFile = result;
+            break;
+          case "extract":
+            selectedExtractFile = result;
+            break;
+          case "rotate":
+            selectedRotateFile = result;
+            break;
+          case "delete":
+            selectedDeleteFile = result;
+            break;
+        }
       }
     } catch (err) {
       showStatus(`Error selecting file: ${err}`, true);

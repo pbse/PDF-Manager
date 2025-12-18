@@ -17,18 +17,6 @@ pub fn split_pdf(path: &str, pages: Vec<u32>, output_path: &str) -> Result<(), S
     if !input_path.is_file() {
         return Err(format!("Input path is not a file: {}", path));
     }
-    if let Some(parent_dir) = Path::new(output_path).parent() {
-        if !parent_dir.exists() {
-            fs::create_dir_all(parent_dir).map_err(|e| {
-                format!(
-                    "Failed to create output directory '{}': {}",
-                    parent_dir.display(),
-                    e
-                )
-            })?;
-        }
-    }
-
     // --- Load Original Document ---
     let doc = Document::load(path).map_err(|e| format!("Failed to load PDF '{}': {}", path, e))?;
 
@@ -57,6 +45,19 @@ pub fn split_pdf(path: &str, pages: Vec<u32>, output_path: &str) -> Result<(), S
                     source_pages_map.len()
                 ))
             }
+        }
+    }
+
+    // --- Ensure output directory exists only after inputs are validated ---
+    if let Some(parent_dir) = Path::new(output_path).parent() {
+        if !parent_dir.exists() {
+            fs::create_dir_all(parent_dir).map_err(|e| {
+                format!(
+                    "Failed to create output directory '{}': {}",
+                    parent_dir.display(),
+                    e
+                )
+            })?;
         }
     }
 
@@ -136,11 +137,11 @@ pub fn split_pdf(path: &str, pages: Vec<u32>, output_path: &str) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*; // Imports split_pdf and its helpers if defined in parent mod
-    use lopdf::{dictionary, Document, Object, Stream}; // Ensure necessary types are imported
+    use crate::pdf::test_utils::create_minimal_pdf;
+    use lopdf::Document;
     use std::fs;
     use std::io::Write; // For non-pdf test
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::AtomicUsize;
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
@@ -149,9 +150,6 @@ mod tests {
         // Store the primary input path created by setup
         input_pdf_path: PathBuf,
     }
-
-    // Counter for unique test run IDs
-    static TEST_RUN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
@@ -210,58 +208,6 @@ mod tests {
     }
 
     // --- Minimal PDF Creation Helper (Corrected for lopdf 0.31.0) ---
-    fn create_minimal_pdf(
-        file_path: &str,
-        num_pages: u32,
-        text_prefix: &str,
-    ) -> std::io::Result<()> {
-        let mut doc = Document::with_version("1.5");
-        let pages_id = doc.new_object_id();
-
-        let font_id = doc.add_object(
-            dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", },
-        );
-        let resources_id = doc.add_object(
-            dictionary! { "Font" => dictionary! { "F1" => Object::Reference(font_id) }, },
-        );
-
-        let mut kids = vec![];
-        for i in 1..=num_pages {
-            let content_str = format!("BT /F1 12 Tf 100 700 Td ({}-Page {}) Tj ET", text_prefix, i);
-            let content_stream = Stream::new(dictionary! {}, content_str.into_bytes());
-            let content_id = doc.add_object(content_stream);
-
-            let page_dict = dictionary! {
-                "Type" => "Page",
-                "Parent" => Object::Reference(pages_id),
-                "MediaBox" => Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]),
-                "Contents" => Object::Reference(content_id),
-                "Resources" => Object::Reference(resources_id),
-            };
-            // Pass Object::Dictionary to add_object
-            let page_id = doc.add_object(Object::Dictionary(page_dict));
-            kids.push(Object::Reference(page_id));
-        }
-
-        // Use Object::Integer(num as i64)
-        doc.objects.insert(
-            pages_id,
-            Object::Dictionary(dictionary! {
-                "Type" => "Pages",
-                "Kids" => Object::Array(kids),
-                "Count" => Object::Integer(num_pages as i64), // Corrected
-            }),
-        );
-
-        let catalog_id = doc.add_object(
-            dictionary! { "Type" => "Catalog", "Pages" => Object::Reference(pages_id), },
-        );
-        doc.trailer.set("Root", Object::Reference(catalog_id));
-
-        doc.save(file_path)?;
-        Ok(())
-    }
-
     // --- Updated Tests ---
 
     #[test]

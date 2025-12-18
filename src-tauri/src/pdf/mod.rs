@@ -10,6 +10,10 @@ pub mod rotator;
 
 pub mod remover;
 
+// Shared helpers only compiled for tests
+#[cfg(test)]
+pub mod test_utils;
+
 // Optional but recommended: Re-export the functions you want to be easily accessible
 // from the 'pdf' module itself, hiding the internal structure (parser, merger, etc.)
 // This makes the import in main.rs cleaner.

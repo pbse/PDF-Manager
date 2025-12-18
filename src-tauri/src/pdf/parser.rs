@@ -23,8 +23,12 @@ fn decode_pdfdoc_encoding(bytes: &[u8]) -> String {
 pub fn parse_pdf(path: &str) -> Result<BTreeMap<String, String>, String> {
     // --- Input Validation (as before) ---
     let input_path = Path::new(path);
-    if !input_path.exists() { /* ... */ }
-    if !input_path.is_file() { /* ... */ }
+    if !input_path.exists() {
+        return Err(format!("Input file not found: {}", path));
+    }
+    if !input_path.is_file() {
+        return Err(format!("Input path is not a file: {}", path));
+    }
 
     // --- Load Document (as before) ---
     let doc = Document::load(path)
@@ -338,15 +342,11 @@ mod tests {
         let err_msg = result.err().unwrap();
         println!("Actual error for not found: {}", err_msg); // Debug print
 
-        // --- FIX: Adjust the expected error message ---
-        // Check for the error coming from Document::load, as that's what we observe
         assert!(
-            err_msg.contains("Failed to load or parse PDF")
-                && err_msg.contains("No such file or directory"),
-            "Error message should indicate load failure due to missing file/dir: {}",
+            err_msg.contains("Input file not found"),
+            "Error message should indicate missing file/dir: {}",
             err_msg
         );
-        // Keep this check too, it's good practice
         assert!(
             err_msg.contains(bad_path),
             "Error message should contain path: {}",

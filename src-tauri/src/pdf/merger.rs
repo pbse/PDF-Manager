@@ -1,146 +1,8 @@
 // Necessary imports
-use lopdf::{Document, Error as LopdfError, Object, ObjectId};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::pdf::utils::manual_deep_copy;
+use lopdf::{dictionary, Document, Object};
 use std::fs;
 use std::path::Path;
-
-// --- Deep Copy Helper Functions (Adapted for Merging/ID Shifting - WITH FIXES) ---
-
-/// Copies objects and dependencies from source_doc to target_doc, shifting ObjectIds.
-/// Updates internal references and page parent pointers.
-fn merge_and_shift_objects(
-    target_doc: &mut Document,
-    source_doc: &Document,
-    id_offset: u32,
-    target_pages_id: ObjectId,
-) -> Result<HashMap<ObjectId, ObjectId>, LopdfError> { // Returns LopdfError
-    let mut id_map: HashMap<ObjectId, ObjectId> = HashMap::new();
-    let mut queue: VecDeque<ObjectId> = VecDeque::new();
-    let mut processed: HashSet<ObjectId> = HashSet::new();
-    let mut loop_count = 0;
-    // Estimate max loops needed more accurately - based only on source objects
-    let max_loops = source_doc.objects.len() * 2 + 10; // Added buffer
-
-    // Start queue with all *root* pages from the source document's page tree.
-    // This is more efficient than queuing *all* objects initially.
-    for page_id in source_doc.get_pages().values() {
-        if processed.insert(*page_id) {
-            queue.push_back(*page_id);
-        }
-    }
-    // Also add other essential roots like Fonts, XObjects directly referenced by pages?
-    // The current recursive find should catch them from the page->resources path.
-
-    // --- Pass 1: Copy objects and build ID map ---
-    while let Some(old_id) = queue.pop_front() {
-        loop_count += 1;
-        if loop_count > max_loops {
-            return Err(LopdfError::Syntax(format!("Deep copy loop exceeded limit ({}) for merge", max_loops)));
-        }
-        if id_map.contains_key(&old_id) { continue; } // Already copied and mapped
-
-        let source_object = match source_doc.get_object(old_id) {
-             Ok(obj) => obj,
-             Err(e) => {
-                 eprintln!("Warning: Failed to get source object {:?} during merge copy: {}. Skipping.", old_id, e);
-                 continue;
-             }
-         };
-
-        // Find references in the ORIGINAL source object FIRST
-        find_references_recursive_merge(source_object, &mut queue, &mut processed)?;
-
-        let cloned_object = source_object.clone();
-        let new_id = (old_id.0 + id_offset, old_id.1);
-        target_doc.objects.insert(new_id, cloned_object);
-        id_map.insert(old_id, new_id);
-    }
-
-    // --- Pass 2: Update references ---
-    for (_old_id, new_id) in &id_map {
-        match target_doc.objects.get_mut(new_id) {
-            Some(target_object) => {
-                update_references_recursive_merge(target_object, &id_map, target_pages_id)?;
-            }
-            None => { // Changed from get_object_mut(...).is_err() check
-                // This indicates an object that *was* mapped couldn't be retrieved. Critical.
-                eprintln!("ERROR: Could not get mapped object {:?} for ref update (Pass 2) during merge.", new_id);
-                return Err(LopdfError::Syntax(format!("Failed to retrieve copied object {:?} during merge reference update", new_id)));
-            }
-        }
-    }
-    Ok(id_map)
-}
-
-/// Helper to find Object::Reference IDs within an object (Merge version).
-fn find_references_recursive_merge(
-    object: &Object,
-    queue: &mut VecDeque<ObjectId>,
-    processed: &mut HashSet<ObjectId>,
-) -> Result<(), LopdfError> {
-    // This helper doesn't directly need Dictionary/Stream types, only Object variants
-    match object {
-        Object::Reference(id) => { if processed.insert(*id) { queue.push_back(*id); } }
-        Object::Array(arr) => { for item in arr { find_references_recursive_merge(item, queue, processed)?; } }
-        Object::Dictionary(dict) => { for (_, value) in dict.iter() { find_references_recursive_merge(value, queue, processed)?; } }
-        Object::Stream(stream) => { for (_, value) in stream.dict.iter() { find_references_recursive_merge(value, queue, processed)?; } }
-        _ => {}
-    }
-    Ok(())
-}
-
-/// Helper to update Object::Reference IDs within a mutable object (Merge version).
-/// Also updates /Parent in Page dictionaries.
-fn update_references_recursive_merge(
-    object: &mut Object,
-    id_map: &HashMap<ObjectId, ObjectId>,
-    target_pages_id: ObjectId,
-) -> Result<(), LopdfError> {
-     match object {
-        Object::Reference(ref mut old_id_ref) => {
-            if let Some(new_id) = id_map.get(old_id_ref) { *old_id_ref = *new_id; }
-        }
-        Object::Array(arr) => {
-            // *** FIXED: Use iter_mut() ***
-            for item in arr.iter_mut() {
-                update_references_recursive_merge(item, id_map, target_pages_id)?;
-            }
-        }
-        Object::Dictionary(dict) => {
-            let is_page = match dict.get(b"Type") {
-                Ok(Object::Name(ref name)) if name == b"Page" => true,
-                _ => false,
-            };
-            if is_page { dict.set("Parent", Object::Reference(target_pages_id)); }
-
-            // Use iter_mut()
-            for (key, value) in dict.iter_mut() {
-                if !(is_page && key == b"Parent".as_ref()) {
-                    update_references_recursive_merge(value, id_map, target_pages_id)?;
-                }
-            }
-        }
-        Object::Stream(stream) => {
-             let is_page_stream_dict = match stream.dict.get(b"Type") {
-                 Ok(Object::Name(ref name)) if name == b"Page" => true,
-                 _ => false,
-             };
-             if is_page_stream_dict { stream.dict.set("Parent", Object::Reference(target_pages_id)); }
-
-             // Use iter_mut()
-             for (key, value) in stream.dict.iter_mut() {
-                 if !(is_page_stream_dict && key == b"Parent".as_ref()) {
-                    update_references_recursive_merge(value, id_map, target_pages_id)?;
-                 }
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-
-// --- merge_pdfs Function ---
 
 #[tauri::command]
 pub fn merge_pdfs(paths: Vec<&str>, output_path: &str) -> Result<(), String> {
@@ -197,97 +59,71 @@ pub fn merge_pdfs(paths: Vec<&str>, output_path: &str) -> Result<(), String> {
         }
     }
 
-    // --- Load First Document ---
+    // --- Build a fresh document using deep copy for every page ---
     let first_path = paths[0];
-    let mut target_doc = Document::load(first_path)
-         .map_err(|e| format!("Failed to load base PDF '{}': {}", first_path, e))?;
+    let first_doc = Document::load(first_path)
+        .map_err(|e| format!("Failed to load base PDF '{}': {}", first_path, e))?;
 
-    // --- Get Target Document's Pages Info ---
-    let catalog = target_doc.catalog() // Use immutable catalog first
-         .map_err(|e| format!("Failed to get catalog from '{}': {}", first_path, e))?;
-    // Get the ObjectId of the root /Pages node in the target document
-    let target_pages_id = catalog.get(b"Pages")
-         .map_err(|e| format!("Failed to get Pages entry from catalog in '{}': {}", first_path, e))?
-         .as_reference()
-         .map_err(|e| format!("Root Pages entry is not a reference in '{}': {}", first_path, e))?;
+    let mut target_doc = Document::with_version(first_doc.version.clone());
+    let target_pages_id = target_doc.new_object_id();
+    let target_catalog_id = target_doc.new_object_id();
+    let mut kids = Vec::new();
 
-    
+    for path in paths {
+        let src_doc = Document::load(path)
+            .map_err(|e| format!("Failed to load source PDF '{}': {}", path, e))?;
 
-    // --- Iterate and Merge Remaining Documents ---
-    let mut new_kids_data = Vec::new(); // Collect new page references here
-    let mut current_max_id = target_doc.max_id; // Track starting from the first doc's max_id
+        let page_ids: Vec<_> = src_doc.get_pages().values().cloned().collect();
+        if page_ids.is_empty() {
+            continue;
+        }
 
-    for path in paths.iter().skip(1) {
-         let source_doc = Document::load(*path)
-              .map_err(|e| format!("Failed to load source PDF '{}': {}", path, e))?;
+        let id_map = manual_deep_copy(&src_doc, &mut target_doc, &page_ids)
+            .map_err(|e| format!("Failed to copy pages from '{}': {}", path, e))?;
 
-         let id_offset = current_max_id; // Use the *current* max_id as the offset for this source doc
-         let source_max_id = source_doc.max_id; // Remember the source's max ID
-
-         // Perform the deep copy, ID shift, and reference updates
-         // Map LopdfError to String here before propagating with ?
-         let id_map = merge_and_shift_objects(&mut target_doc, &source_doc, id_offset, target_pages_id)
-                .map_err(|e| format!("Failed merging objects from '{}': {}", path, e))?;
-
-         // Update the max_id tracker for the *next* iteration
-         current_max_id += source_max_id;
-
-         // Collect the *new* references to the pages from the source doc
-         let source_pages = source_doc.get_pages();
-         for (_page_num, old_page_id) in source_pages {
-              if let Some(new_page_id) = id_map.get(&old_page_id) {
-                   new_kids_data.push(Object::Reference(*new_page_id));
-              } else {
-                   // This indicates an internal error if a page wasn't mapped
-                   eprintln!("Warning: Page {:?} from '{}' was not found in the merged object map. Skipping.", old_page_id, path);
-                   // Return error instead? Stricter:
-                   return Err(format!("Internal error: Page {:?} from '{}' was not found in the merged object map.", old_page_id, path));
-              }
-         }
-    } // End loop over paths
-
-    // --- Finalize: Update Kids Array, Page Count, and Document Max ID ---
-    // Update the target document's max_id *once* after all merging is done
-    target_doc.max_id = current_max_id;
-
-    { // Scope the final mutable borrow of the Pages dictionary
-        let pages_dict_mut = target_doc
-            .get_object_mut(target_pages_id)
-            .map_err(|e| {
+        for old_page_id in page_ids {
+            let new_page_id = *id_map.get(&old_page_id).ok_or_else(|| {
                 format!(
-                    "Failed to get mutable Pages object {:?} for final update: {}",
-                    target_pages_id, e
-                )
-            })?
-            .as_dict_mut()
-            .map_err(|_| {
-                format!(
-                    "Final Pages object {:?} is not a dictionary",
-                    target_pages_id
+                    "Internal error: mapped page id for {:?} from '{}' missing",
+                    old_page_id, path
                 )
             })?;
 
-        // Get the mutable kids array
-        let kids_array = pages_dict_mut
-            .get_mut(b"Kids")
-            .map_err(|e| format!("Failed to get mutable Kids entry for final update: {}", e))?
-            .as_array_mut()
-            .map_err(|_| "Final Pages Kids object is not an array".to_string())?;
+            {
+                let page_obj = target_doc.get_object_mut(new_page_id).map_err(|e| {
+                    format!("Failed to fetch copied page {:?}: {}", new_page_id, e)
+                })?;
+                let page_dict = page_obj.as_dict_mut().map_err(|_| {
+                    format!("Copied page {:?} is not a dictionary", new_page_id)
+                })?;
+                page_dict.set("Parent", Object::Reference(target_pages_id));
+            }
 
-        // Extend with the collected new page references (no clone needed)
-        kids_array.extend(new_kids_data);
+            kids.push(Object::Reference(new_page_id));
+        }
+    }
 
-        // Calculate and set the final page count
-        // Use the length of the *final* kids_array to be certain
-        let final_page_count = kids_array.len() as i64;
-        pages_dict_mut.set("Count", Object::Integer(final_page_count));
+    target_doc.objects.insert(
+        target_pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages",
+            "Kids" => Object::Array(kids.clone()),
+            "Count" => Object::Integer(kids.len() as i64),
+        }),
+    );
+    target_doc.objects.insert(
+        target_catalog_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => Object::Reference(target_pages_id),
+        }),
+    );
+    target_doc.trailer.set("Root", Object::Reference(target_catalog_id));
 
-    } // End final mutable borrow
-
-    // --- Save Merged Document ---
-    target_doc.compress(); // Optional
-    target_doc.save(output_path)
-         .map_err(|e| format!("Failed to save merged PDF to '{}': {}", output_path, e))?;
+    target_doc.compress();
+    target_doc
+        .save(output_path)
+        .map_err(|e| format!("Failed to save merged PDF to '{}': {}", output_path, e))?;
 
     Ok(())
 }
@@ -297,66 +133,12 @@ pub fn merge_pdfs(paths: Vec<&str>, output_path: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lopdf::{dictionary, Document, Object, Stream}; // Ensure Dictionary is imported
+    use crate::pdf::test_utils::create_minimal_pdf;
+    use lopdf::Document;
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf}; // Use PathBuf
     use std::sync::atomic::{AtomicUsize, Ordering}; // For unique IDs
-
-    fn create_minimal_pdf(
-        file_path: &str,
-        num_pages: u32,
-        text_prefix: &str,
-    ) -> std::io::Result<()> {
-
-        let mut doc = Document::with_version("1.5");
-        let pages_id = doc.new_object_id();
-
-        let font_id = doc.add_object(
-            dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", },
-        );
-        let resources_id = doc.add_object(
-            dictionary! { "Font" => dictionary! { "F1" => Object::Reference(font_id) }, },
-        );
-
-        let mut kids = vec![];
-        for i in 1..=num_pages {
-            let content_str = format!("BT /F1 12 Tf 100 700 Td ({}-Page {}) Tj ET", text_prefix, i);
-            let content_stream = Stream::new(dictionary! {}, content_str.into_bytes());
-            let content_id = doc.add_object(content_stream);
-
-            // Use the dictionary! macro consistently
-            let page_dict = dictionary! {
-                "Type" => "Page",
-                "Parent" => Object::Reference(pages_id),
-                "MediaBox" => Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]),
-                "Contents" => Object::Reference(content_id),
-                "Resources" => Object::Reference(resources_id),
-            };
-            // Pass the dictionary directly to add_object
-            let page_id = doc.add_object(Object::Dictionary(page_dict)); // Corrected: wrap in Object::Dictionary
-            kids.push(Object::Reference(page_id));
-        }
-
-        // Use dictionary! macro consistently
-        doc.objects.insert(
-            pages_id,
-            Object::Dictionary(dictionary! {
-                "Type" => "Pages",
-                "Kids" => Object::Array(kids),
-                // Correct way to convert u32 to Object::Integer
-                "Count" => Object::Integer(num_pages as i64),
-            }),
-        );
-
-        let catalog_id = doc.add_object(
-            dictionary! { "Type" => "Catalog", "Pages" => Object::Reference(pages_id), },
-        );
-        doc.trailer.set("Root", Object::Reference(catalog_id));
-
-        doc.save(file_path)?;
-        Ok(())
-    }
 
     // --- Use unique directory names ---
     // Base names

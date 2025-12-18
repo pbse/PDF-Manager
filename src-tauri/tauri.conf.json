@@ -37,5 +37,24 @@
     ],
     "targets": "all"
   },
-  "plugins": {}
+  "plugins": {
+    "ipc": {
+      "allowlist": [
+        "app:ipc:parse_pdf",
+        "app:ipc:merge_pdfs",
+        "app:ipc:split_pdf",
+        "app:ipc:extract_pdf_page",
+        "app:ipc:rotate_pdf",
+        "app:ipc:delete_pages",
+        "app:ipc:open_file_dialog",
+        "app:ipc:save_file_dialog",
+        "app:ipc:get_os_type",
+        "app:ipc:shell_open",
+        "plugin:dialog:open",
+        "plugin:dialog:save",
+        "plugin:os:type",
+        "plugin:shell:open"
+      ]
+    }
+  }
 }

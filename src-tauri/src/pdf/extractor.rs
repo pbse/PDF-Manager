@@ -147,7 +147,8 @@ pub fn extract_pdf_page(path: &str, page_number: u32, output_path: &str) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*; // Imports extract_pdf_page and helpers if they are in the parent mod
-    use lopdf::{dictionary, Document}; // Ensure Dictionary is imported
+    use crate::pdf::test_utils::create_minimal_pdf;
+    use lopdf::Document;
     use std::fs;
     use std::io::Write; // For creating non-pdf file test
     use std::path::{Path, PathBuf};
@@ -165,8 +166,14 @@ mod tests {
             let unique_suffix = format!("{}", test_name);
 
             // Place artifacts in target/ directory
-            let test_dir = PathBuf::from("target/test_data_extractor").join(&unique_suffix);
-            let output_dir = PathBuf::from("target/test_output_extractor").join(&unique_suffix);
+            let base_data_dir = PathBuf::from("target/test_data_extractor");
+            let base_output_dir = PathBuf::from("target/test_output_extractor");
+            // Ensure base dirs exist to avoid InvalidInput on some platforms
+            fs::create_dir_all(&base_data_dir).ok();
+            fs::create_dir_all(&base_output_dir).ok();
+
+            let test_dir = base_data_dir.join(&unique_suffix);
+            let output_dir = base_output_dir.join(&unique_suffix);
 
             // Clean up potential remnants from previous runs of THIS specific test
             if test_dir.exists() {
@@ -214,81 +221,6 @@ mod tests {
             fs::remove_dir_all(&self.test_dir).ok();
             fs::remove_dir_all(&self.output_dir).ok();
         }
-    }
-
-    // --- Minimal PDF Creation Helper ---
-    fn create_minimal_pdf(
-        file_path: &str,
-        num_pages: u32,
-        text_prefix: &str,
-    ) -> std::io::Result<()> {
-        // Imports needed within this function
-        use lopdf::{dictionary, Document, Object, Stream}; // Ensure Dictionary is here
-
-        let mut doc = Document::with_version("1.5");
-        let pages_id = doc.new_object_id(); // ID for the Pages dictionary
-
-        // 1. Create and add the shared Resources dictionary FIRST
-        let resources_dict = dictionary! {
-            "Font" => dictionary! {
-                // Font needs to be an object itself, referenced here
-                "F1" => doc.add_object(dictionary! {
-                    "Type" => "Font",
-                    "Subtype" => "Type1",
-                    "BaseFont" => "Helvetica",
-                })
-            },
-            // Add other resources here if needed (e.g., ProcSet is common)
-            "ProcSet" => Object::Array(vec![
-                Object::Name(b"PDF".to_vec()),
-                Object::Name(b"Text".to_vec()),
-                // Add ImageB, ImageC, ImageI if images are used (though not in this example)
-            ]),
-        };
-        // Add the Resources dictionary as an object and get its ID
-        let resources_id = doc.add_object(Object::Dictionary(resources_dict)); // Wrap in Object::Dictionary
-
-        // 2. Create Page objects, referencing the *same* resources_id
-        let mut kids = vec![];
-        for i in 1..=num_pages {
-            let content_str = format!("BT /F1 12 Tf 100 700 Td ({}-Page {}) Tj ET", text_prefix, i);
-            let content_stream = Stream::new(dictionary! {}, content_str.into_bytes());
-            let content_id = doc.add_object(content_stream);
-
-            // Create the dictionary for this specific page
-            let page_dict = dictionary! {
-                "Type" => "Page",
-                "Parent" => Object::Reference(pages_id),
-                "MediaBox" => Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]),
-                "Contents" => Object::Reference(content_id),
-                // *** CRUCIAL FIX: Reference the previously created resources_id ***
-                "Resources" => Object::Reference(resources_id),
-            };
-            // Add the page dictionary as an object
-            let page_id = doc.add_object(Object::Dictionary(page_dict));
-            kids.push(Object::Reference(page_id));
-        }
-
-        // 3. Create the Pages dictionary object, referencing the kids
-        doc.objects.insert(
-            pages_id,
-            Object::Dictionary(dictionary! {
-                "Type" => "Pages",
-                "Kids" => Object::Array(kids),
-                "Count" => Object::Integer(num_pages as i64),
-            }),
-        );
-
-        // 4. Create Catalog, referencing the Pages dictionary
-        let catalog_id = doc.add_object(dictionary! {
-             "Type" => "Catalog",
-             "Pages" => Object::Reference(pages_id),
-        });
-        doc.trailer.set("Root", Object::Reference(catalog_id));
-
-        // 5. Save the document
-        doc.save(file_path)?;
-        Ok(())
     }
 
     // --- Updated Tests ---
