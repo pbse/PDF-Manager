@@ -6,6 +6,13 @@
         "tauri": "tauri",
         "dev": "tauri dev",
         "build": "tauri build",
+        "build:mac": "tauri build",
+        "build:win": "tauri build --target x86_64-pc-windows-msvc",
+        "build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+        "build:ios": "tauri ios build",
+        "dev:ios": "tauri ios dev",
+        "build:android": "tauri android build",
+        "dev:android": "tauri android dev",
         "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
     },
     "devDependencies": {

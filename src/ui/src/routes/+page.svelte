@@ -52,6 +52,15 @@
     }
   }
 
+  const sponsorUrl = "https://github.com/sponsors/pbse";
+  async function openSponsor() {
+    try {
+      await shellOpen(sponsorUrl);
+    } catch (err) {
+      showStatus(`Unable to open sponsor link: ${err}`, true);
+    }
+  }
+
   // --- Event Handlers ---
 
   async function selectFile(target: SelectionTarget) {
@@ -305,9 +314,37 @@
 </script>
 
 <div class="app-container">
-  <header class="app-header">
-    <h1>PDF Manager</h1>
-    <p class="subtitle">A modern tool for managing your PDF files</p>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Workspace / PDF Ops</p>
+      <h1>PDF Manager</h1>
+      <p class="subtitle">
+        Reliable desktop-grade PDF tools for merging, splitting, rotating, and inspecting files. All processing is done locally on your machine.
+      </p>
+      <div class="hero-actions">
+        <span class="chip success">Ready</span>
+        <span class="chip neutral">Local Processing</span>
+        <span class="chip ghost">No cloud upload</span>
+      </div>
+    </div>
+    <div class="hero-card">
+      <p class="hero-label">Quick Start</p>
+      <div class="hero-steps">
+        <div>
+          <span class="step-num">1</span>
+          <span>Select PDF(s)</span>
+        </div>
+        <div>
+          <span class="step-num">2</span>
+          <span>Pick an action</span>
+        </div>
+        <div>
+          <span class="step-num">3</span>
+          <span>Save & preview</span>
+        </div>
+      </div>
+      <p class="muted">Supports macOS, Windows, Linux. Files stay on your machine.</p>
+    </div>
   </header>
 
   <main class="content-grid">
@@ -610,15 +647,13 @@
   </main>
 
   <footer class="app-footer">
-    <a
-      href="https://github.com/sponsors/pbse"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="sponsor-button"
-    >
-      ❤️ Sponsor this project
-    </a>
-    <p class="footer-text">Made with ❤️ using Tauri and Svelte</p>
+    <div class="footer-left">
+      <p class="footer-text">Files never leave your device.</p>
+      <p class="footer-text">Need help? Check logs in the status bar below.</p>
+    </div>
+    <button class="sponsor-button" on:click={openSponsor}>
+      Sponsor
+    </button>
   </footer>
 </div>
 
@@ -626,48 +661,183 @@
 
 <style>
   :root {
-    --primary-color: #2563eb;
-    --secondary-color: #1e40af;
-    --background-color: #f8fafc;
-    --card-background: #ffffff;
-    --text-color: #1e293b;
-    --border-color: #e2e8f0;
-    --hover-color: #dbeafe;
-    --disabled-color: #94a3b8;
+    --primary-color: #1d4ed8;
+    --primary-accent: #22d3ee;
+    --secondary-color: #0f172a;
+    --background-color: #0b1021;
+    --surface: rgba(255, 255, 255, 0.06);
+    --card-background: rgba(255, 255, 255, 0.08);
+    --text-color: #e2e8f0;
+    --muted: #94a3b8;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --hover-color: rgba(255, 255, 255, 0.12);
+    --disabled-color: #475569;
+    --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.35);
+    --gradient: radial-gradient(circle at 20% 20%, rgba(34, 211, 238, 0.18), transparent 35%),
+      radial-gradient(circle at 80% 0%, rgba(99, 102, 241, 0.2), transparent 30%),
+      linear-gradient(135deg, rgba(13, 31, 77, 0.9), rgba(10, 15, 35, 0.95));
+  }
+
+  @media (max-width: 768px) {
+    :root {
+      --shadow-strong: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
   }
 
   .app-container {
     min-height: 100vh;
-    background-color: var(--background-color);
-    padding: 2rem;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
+    background: var(--gradient);
+    padding: 2.5rem 1.5rem 2rem;
+    font-family: "Manrope", "SF Pro Display", "Segoe UI", sans-serif;
+    color: var(--text-color);
+    position: relative;
+    overflow: hidden;
   }
 
-  .app-header {
-    text-align: center;
-    margin-bottom: 3rem;
+  .app-container::before,
+  .app-container::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
   }
 
-  .app-header h1 {
-    font-size: 2.5rem;
-    color: var(--primary-color);
-    margin: 0;
+  .app-container::before {
+    background: radial-gradient(600px circle at 10% 20%, rgba(34, 211, 238, 0.08), transparent 40%);
+  }
+
+  .app-container::after {
+    background: radial-gradient(700px circle at 90% 10%, rgba(99, 102, 241, 0.08), transparent 45%);
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: 1.4fr 0.9fr;
+    gap: 1.25rem;
+    align-items: stretch;
+    margin: 0 auto 2rem;
+    max-width: 1200px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero h1 {
+    margin: 0 0 0.35rem;
+    font-size: 2.6rem;
+    letter-spacing: -0.02em;
   }
 
   .subtitle {
+    color: var(--muted);
+    line-height: 1.5;
+    max-width: 720px;
+  }
+
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--primary-accent);
+    margin: 0 0 0.35rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color);
+    background: var(--surface);
     color: var(--text-color);
-    opacity: 0.8;
+  }
+
+  .chip.success {
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #bbf7d0;
+  }
+
+  .chip.neutral {
+    border-color: rgba(148, 163, 184, 0.35);
+  }
+
+  .chip.ghost {
+    border-color: transparent;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+  }
+
+  .hero-card {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    box-shadow: var(--shadow-strong);
+    backdrop-filter: blur(12px);
+  }
+
+  .hero-label {
+    margin: 0 0 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .hero-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .hero-steps div {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+  }
+
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: #e0f2fe;
+    font-weight: 700;
+    font-size: 0.9rem;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
+  }
+
+  .muted {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
   }
 
   .content-grid {
-    max-width: 1200px; /* Reduced from 1200px */
+    max-width: 1200px;
     margin: 0 auto;
-    gap: 1.5rem; /* Reduced from 2rem */
+    gap: 1.5rem;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 1;
   }
 
   .tools-grid {
@@ -679,19 +849,23 @@
   .card {
     background: var(--card-background);
     border-radius: 1rem;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    box-shadow: var(--shadow-strong);
     overflow: hidden;
-    transition: transform 0.2s;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(12px);
   }
 
   .card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
   }
 
   .card-header {
-    background: var(--primary-color);
-    color: white;
-    padding: 1rem; /* Reduced from 1.5rem */
+    background: linear-gradient(120deg, rgba(37, 99, 235, 0.95), rgba(34, 211, 238, 0.7));
+    color: #e2f3ff;
+    padding: 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -709,6 +883,7 @@
     gap: 0.5rem;
     width: 100%;
     box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .button-group {
@@ -725,16 +900,19 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    letter-spacing: 0.01em;
   }
 
   .primary-button {
-    background: var(--primary-color);
-    color: white;
+    background: linear-gradient(120deg, #2563eb, #22d3ee);
+    color: #f8fafc;
+    box-shadow: 0 10px 30px rgba(34, 211, 238, 0.25);
   }
 
   .secondary-button {
-    background: var(--secondary-color);
-    color: white;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid var(--border-color);
   }
 
   .primary-button:hover,
@@ -751,25 +929,26 @@
   }
 
   .file-badge {
-    background: var(--hover-color);
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    margin: 0.5rem 0;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.6rem 0.9rem;
+    border-radius: 0.75rem;
+    margin: 0.25rem 0;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
+    border: 1px solid var(--border-color);
   }
 
   .input-group {
     margin: 1rem 0;
-    width: 100%; /* Ensure input group takes full width */
+    width: 100%;
     box-sizing: border-box;
   }
 
   .input-group label {
     display: block;
     margin-bottom: 0.5rem;
-    color: var(--text-color);
+    color: #cbd5e1;
     font-size: 0.9rem;
   }
 
@@ -777,10 +956,19 @@
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
+    border-radius: 0.65rem;
     font-size: 1rem;
-    box-sizing: border-box; /* Include padding in width calculation */
-    min-width: 0; /* Prevent input from overflowing */
+    box-sizing: border-box;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-color);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-group input:focus {
+    outline: none;
+    border-color: rgba(34, 211, 238, 0.7);
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
   }
 
   .metadata-container {
@@ -793,40 +981,52 @@
   }
 
   .metadata-item {
-    padding: 0.75rem;
-    background: var(--background-color);
-    border-radius: 0.5rem;
+    padding: 0.9rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 0.65rem;
     display: flex;
     justify-content: space-between;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
   }
 
   .app-footer {
-    text-align: center;
-    margin-top: 3rem;
-    padding: 2rem;
+    margin-top: 2.5rem;
+    padding: 1.25rem;
     border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
 
   .sponsor-button {
-    display: inline-block;
-    background: #db2777;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(120deg, #ec4899, #8b5cf6);
     color: white;
-    padding: 0.75rem 2rem;
+    padding: 0.65rem 1.6rem;
     border-radius: 9999px;
     text-decoration: none;
-    font-weight: 500;
-    margin-bottom: 1rem;
-    transition: all 0.2s;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 12px 30px rgba(236, 72, 153, 0.25);
   }
 
   .sponsor-button:hover {
-    transform: scale(1.05);
-    background: #be185d;
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 16px 36px rgba(139, 92, 246, 0.3);
   }
 
   .footer-text {
-    color: var(--text-color);
-    opacity: 0.7;
+    color: var(--muted);
+    margin: 0.15rem 0;
+  }
+
+  .footer-left {
+    display: flex;
+    flex-direction: column;
   }
 
   /* Add new styles */
@@ -857,8 +1057,13 @@
       padding: 0.75rem;
     }
 
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
     .content-grid {
-      gap: 1rem; /* Reduced from 1.5rem */
+      gap: 1rem;
     }
 
     .tools-grid {

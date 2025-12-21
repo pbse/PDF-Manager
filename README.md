@@ -76,6 +76,25 @@ The built app will appear in:
 - **Windows:** `src-tauri/target/release/bundle/msi/`
 - **Linux:** `src-tauri/target/release/bundle/deb/` or AppImage
 
+### Platform targets and scripts
+
+Desktop (macOS/Windows/Linux):
+- macOS (run on macOS): `pnpm run build:mac`
+- Windows (run on Windows): `pnpm run build:win` (requires MSVC toolchain)
+- Linux (run on Linux): `pnpm run build:linux` (requires WebKit2GTK and related deps per Tauri docs)
+
+Mobile (requires platform SDKs + Rust targets + Tauri mobile tooling):
+- iOS/iPadOS (on macOS with Xcode, Rust targets `aarch64-apple-ios` + `x86_64-apple-ios`, and cocoapods):
+  - Dev: `pnpm run dev:ios`
+  - Build: `pnpm run build:ios` (signing/provisioning required for device/TestFlight)
+- Android (with Android SDK/NDK, Java 17, Rust targets `aarch64-linux-android` + `armv7-linux-androideabi`):
+  - Dev: `pnpm run dev:android`
+  - Build: `pnpm run build:android` (configure keystore for release)
+
+Notes:
+- Cross-compiling desktop apps is best done on the target OS (or via CI runners) because of native toolchain requirements.
+- Tauri mobile commands (`tauri ios/android ...`) assume you’ve run the corresponding `tauri ios init` / `tauri android init` and have the platform SDKs installed.
+
 ---
 
 ## Code Structure Overview
@@ -106,4 +125,3 @@ This project is open-sourced under the MIT License. See `LICENSE` file for detai
 ## Maintainer
 - [Prashant Bansal](mailto:dev@prashantb.me)
 - GitHub: [pbse](https://github.com/pbse)
-
