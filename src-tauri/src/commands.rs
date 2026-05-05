@@ -100,3 +100,34 @@ pub async fn shell_open(
         .open_url(file_path, None::<String>) // Call the open_url method directly on app_handle
         .map_err(|e| e.to_string()) // Map the opener::Error to String
 }
+
+#[command]
+pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| format!("Failed to read file at {}: {}", path, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_file_bytes_success() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "Hello, World!").unwrap();
+        let path = file.path().to_str().unwrap().to_string();
+
+        let result = read_file_bytes(path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"Hello, World!\n");
+    }
+
+    #[test]
+    fn test_read_file_bytes_not_found() {
+        let path = "/path/to/non_existent_file.pdf".to_string();
+        let result = read_file_bytes(path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to read file"));
+    }
+}

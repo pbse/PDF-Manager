@@ -156,8 +156,13 @@ mod tests {
             let unique_suffix = format!("{}", test_name);
 
             // Place artifacts in target/ directory
-            let test_dir = PathBuf::from("target/test_data_splitter").join(&unique_suffix);
-            let output_dir = PathBuf::from("target/test_output_splitter").join(&unique_suffix);
+            let base_data_dir = PathBuf::from("target/test_data_splitter");
+            let base_output_dir = PathBuf::from("target/test_output_splitter");
+            fs::create_dir_all(&base_data_dir).ok();
+            fs::create_dir_all(&base_output_dir).ok();
+
+            let test_dir = base_data_dir.join(&unique_suffix);
+            let output_dir = base_output_dir.join(&unique_suffix);
 
             // Clean up potential remnants from previous runs of THIS specific test
             if test_dir.exists() {

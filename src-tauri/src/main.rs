@@ -7,7 +7,10 @@ mod commands;
 mod pdf;
 
 // Use the re-exported functions directly from the 'pdf' module
-use crate::pdf::{extract_pdf_page, merge_pdfs, parse_pdf, split_pdf, rotate_pdf, delete_pages};
+use crate::pdf::{
+    add_annotation, add_signature_visual, delete_pages, extract_pdf_page, merge_pdfs, parse_pdf,
+    rotate_pdf, sign_pdf_pfx, split_pdf, verify_signatures,
+};
 
 fn main() {
     tauri::Builder::default()
@@ -37,10 +40,15 @@ fn main() {
             extract_pdf_page,
             rotate_pdf,
             delete_pages,
+            add_annotation,
+            add_signature_visual,
+            sign_pdf_pfx,
+            verify_signatures,
             commands::open_file_dialog,
             commands::save_file_dialog,
             commands::get_os_type,
             commands::shell_open,
+            commands::read_file_bytes,
             // Ensure these names match exactly what's imported above
         ])
         .run(tauri::generate_context!())

@@ -1,26 +1,122 @@
 <script lang="ts">
   // Import invoke from the core namespace (which remains available)
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { onMount } from "svelte";
 
   // Local imports
   import StatusDisplay from "$lib/components/StatusDisplay.svelte";
+  import PdfViewer from "$lib/components/PdfViewer.svelte";
   import { parsePageString } from "$lib/utils";
   import { isLoading, showStatus, startLoading } from "$lib/stores";
 
   // --- Reactive State ---
-  type SelectionTarget = "parse" | "split" | "extract" | "rotate" | "delete";
+  type SelectionTarget =
+    | "parse"
+    | "split"
+    | "extract"
+    | "rotate"
+    | "delete"
+    | "annotate"
+    | "signature"
+    | "crypto";
 
   let selectedParseFile: string | null = null;
   let selectedSplitFile: string | null = null;
   let selectedExtractFile: string | null = null;
   let selectedRotateFile: string | null = null;
   let selectedDeleteFile: string | null = null;
+  let selectedAnnotateFile: string | null = null;
+  let selectedSignatureFile: string | null = null;
+  let selectedCryptoFile: string | null = null;
   let parseResult: Record<string, string> | null = null;
   let selectedMergeFiles: string[] = [];
   let splitPagesInput: string = ""; // e.g., "1, 3-5, 8"
   let extractPageInput: number | null = null;
   let rotatePagesInput: string = "";
   let deletePagesInput: string = "";
+  let annotationPageInput: number | null = null;
+  let annotationRectInput: string = "";
+  let annotationType: "highlight" | "underline" | "strikeout" | "note" = "highlight";
+  let annotationText: string = "";
+  let annotationColor: string = "#facc15";
+  let signaturePageInput: number | null = null;
+  let signatureRectInput: string = "";
+  let signatureColor: string = "#1ebc85";
+  let signatureWidth: number | null = 2;
+  let signaturePointsInput: string = "";
+  let signCertPath: string = "";
+  let signCertPassword: string = "";
+  let signPageInput: number | null = null;
+  let signRectInput: string = "";
+  let signReason: string = "";
+  let signLocation: string = "";
+  let signContact: string = "";
+
+  // --- Active Tool State ---
+  type ToolId = "merge" | "annotate" | "signature" | "crypto" | "split" | "parse" | "organize";
+  let activeTool: ToolId = "annotate";
+
+  // --- Viewer State ---
+  let viewerFilePath = "";
+  let viewerPageNumber = 1;
+  let viewerMode: "rect" | "points" = "rect";
+  let viewerTarget: SelectionTarget | null = null;
+
+  function openViewer(target: SelectionTarget, mode: "rect" | "points" = "rect") {
+    let path = "";
+    let page = 1;
+    switch (target) {
+      case "annotate":
+        path = selectedAnnotateFile || "";
+        page = annotationPageInput || 1;
+        break;
+      case "signature":
+        path = selectedSignatureFile || "";
+        page = signaturePageInput || 1;
+        break;
+      case "crypto":
+        path = selectedCryptoFile || "";
+        page = signPageInput || 1;
+        break;
+    }
+
+    if (!path) {
+      showStatus("Please select a PDF file first.", true);
+      return;
+    }
+
+    viewerFilePath = path;
+    viewerPageNumber = page;
+    viewerMode = mode;
+    viewerTarget = target;
+  }
+
+  function handleViewerSelect(event: CustomEvent) {
+    const { rect, points } = event.detail;
+
+    if (rect) {
+      const rectStr = rect.map((n: number) => Math.round(n)).join(", ");
+      switch (viewerTarget) {
+        case "annotate":
+          annotationRectInput = rectStr;
+          break;
+        case "signature":
+          signatureRectInput = rectStr;
+          break;
+        case "crypto":
+          signRectInput = rectStr;
+          break;
+      }
+    }
+
+    if (points) {
+      const pointsStr = points.map((p: [number, number]) => `${Math.round(p[0])},${Math.round(p[1])}`).join("; ");
+      if (viewerTarget === "signature") {
+        signaturePointsInput = pointsStr;
+      }
+    }
+  }
 
   // --- Helper functions using invoke (wrap native functionality) ---
 
@@ -61,6 +157,86 @@
     }
   }
 
+  function parseRect(rectStr: string): number[] | null {
+    const parts = rectStr
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (parts.length !== 4) return null;
+    const nums = parts.map((p) => Number(p));
+    if (nums.some((n) => Number.isNaN(n))) return null;
+    return nums;
+  }
+
+  function parseColorHex(hex: string): [number, number, number] | null {
+    const match = /^#?([a-fA-F0-9]{6})$/.exec(hex.trim());
+    if (!match) return null;
+    const intVal = parseInt(match[1], 16);
+    const r = ((intVal >> 16) & 255) / 255;
+    const g = ((intVal >> 8) & 255) / 255;
+    const b = (intVal & 255) / 255;
+    return [r, g, b];
+  }
+
+  async function handleCryptoSign() {
+    if (!selectedCryptoFile) {
+      showStatus("Select a PDF to sign.", true);
+      return;
+    }
+    if (!signCertPath) {
+      showStatus("Select a PFX/P12 certificate.", true);
+      return;
+    }
+    if (!signCertPassword) {
+      showStatus("Enter the certificate password.", true);
+      return;
+    }
+    if (!signPageInput || signPageInput <= 0) {
+      showStatus("Enter a valid page number.", true);
+      return;
+    }
+    const rectArray = parseRect(signRectInput);
+    if (!rectArray) {
+      showStatus("Invalid rect. Use format: x1, y1, x2, y2", true);
+      return;
+    }
+    const outputPath = await getSavePath("signed-crypto.pdf");
+    if (!outputPath) return;
+
+    startLoading("Signing (crypto)...");
+    try {
+      await invoke("sign_pdf_pfx", {
+        path: selectedCryptoFile,
+        page: signPageInput,
+        rect: rectArray,
+        pfxPath: signCertPath,
+        pfxPassword: signCertPassword,
+        reason: signReason || null,
+        location: signLocation || null,
+        contact: signContact || null,
+        outputPath,
+      });
+      showStatus("Signing completed.", false);
+      await openPathInExplorer(outputPath);
+    } catch (err) {
+      showStatus(`Signing failed: ${err}`, true);
+    }
+  }
+
+  async function handleVerifySignatures() {
+    if (!selectedCryptoFile) {
+      showStatus("Select a PDF to verify.", true);
+      return;
+    }
+    startLoading("Verifying signatures...");
+    try {
+      const result = await invoke("verify_signatures", { path: selectedCryptoFile });
+      showStatus(`Verification result: ${JSON.stringify(result)}`, false);
+    } catch (err) {
+      showStatus(`Verification failed: ${err}`, true);
+    }
+  }
+
   // --- Event Handlers ---
 
   async function selectFile(target: SelectionTarget) {
@@ -83,7 +259,17 @@
           case "delete":
             selectedDeleteFile = result;
             break;
+          case "annotate":
+            selectedAnnotateFile = result;
+            break;
+          case "signature":
+            selectedSignatureFile = result;
+            break;
+          case "crypto":
+            selectedCryptoFile = result;
+            break;
         }
+        viewerFilePath = result; // Auto-show in preview
       }
     } catch (err) {
       showStatus(`Error selecting file: ${err}`, true);
@@ -112,6 +298,17 @@
     } catch (err) {
       showStatus(`Error getting save path: ${err}`, true);
       return null;
+    }
+  }
+
+  async function selectCertFile() {
+    try {
+      const result = await openFileDialog(false);
+      if (result && typeof result === "string") {
+        signCertPath = result;
+      }
+    } catch (err) {
+      showStatus(`Error selecting certificate: ${err}`, true);
     }
   }
 
@@ -286,6 +483,7 @@
   function clearParseSelection() {
     selectedParseFile = null;
     parseResult = null;
+    if (viewerFilePath === selectedParseFile) viewerFilePath = "";
   }
 
   function clearMergeSelection() {
@@ -295,354 +493,426 @@
   function clearSplitSelection() {
     selectedSplitFile = null;
     splitPagesInput = "";
+    if (viewerFilePath === selectedSplitFile) viewerFilePath = "";
   }
 
   function clearExtractSelection() {
     selectedExtractFile = null;
     extractPageInput = null;
+    if (viewerFilePath === selectedExtractFile) viewerFilePath = "";
   }
 
   function clearRotateSelection() {
     selectedRotateFile = null;
     rotatePagesInput = "";
+    if (viewerFilePath === selectedRotateFile) viewerFilePath = "";
   }
 
   function clearDeleteSelection() {
     selectedDeleteFile = null;
     deletePagesInput = "";
+    if (viewerFilePath === selectedDeleteFile) viewerFilePath = "";
   }
+
+  function clearAnnotateSelection() {
+    selectedAnnotateFile = null;
+    annotationPageInput = null;
+    annotationRectInput = "";
+    annotationText = "";
+    annotationType = "highlight";
+    annotationColor = "#facc15";
+    if (viewerFilePath === selectedAnnotateFile) viewerFilePath = "";
+  }
+
+  function clearSignatureSelection() {
+    selectedSignatureFile = null;
+    signaturePageInput = null;
+    signatureRectInput = "";
+    signatureColor = "#1ebc85";
+    signatureWidth = 2;
+    signaturePointsInput = "";
+    if (viewerFilePath === selectedSignatureFile) viewerFilePath = "";
+  }
+
+  function clearCryptoSelection() {
+    selectedCryptoFile = null;
+    signCertPath = "";
+    signCertPassword = "";
+    signPageInput = null;
+    signRectInput = "";
+    signReason = "";
+    signLocation = "";
+    signContact = "";
+    if (viewerFilePath === selectedCryptoFile) viewerFilePath = "";
+  }
+
+  $: {
+    if (viewerTarget === "annotate" && annotationPageInput) {
+      viewerPageNumber = annotationPageInput;
+    } else if (viewerTarget === "signature" && signaturePageInput) {
+      viewerPageNumber = signaturePageInput;
+    } else if (viewerTarget === "crypto" && signPageInput) {
+      viewerPageNumber = signPageInput;
+    }
+  }
+
+  async function handleAnnotate() {
+    if (!selectedAnnotateFile) {
+      showStatus("Please select a PDF to annotate.", true);
+      return;
+    }
+    if (!annotationPageInput || annotationPageInput <= 0) {
+      showStatus("Enter a valid page number.", true);
+      return;
+    }
+    const rectArray = parseRect(annotationRectInput);
+    if (!rectArray) {
+      showStatus("Invalid rect. Use format: x1, y1, x2, y2", true);
+      return;
+    }
+    const colorArray = parseColorHex(annotationColor);
+    if (!colorArray) {
+      showStatus("Invalid color. Use 6-digit hex.", true);
+      return;
+    }
+
+    const outputPath = await getSavePath("annotated.pdf");
+    if (!outputPath) return;
+
+    startLoading("Adding annotation...");
+    try {
+      await invoke("add_annotation", {
+        path: selectedAnnotateFile,
+        page: annotationPageInput,
+        rect: rectArray,
+        kind: annotationType,
+        contents: annotationText || null,
+        color: colorArray,
+        outputPath,
+      });
+      showStatus(`Annotation added and saved to ${outputPath}.`, false);
+      await openPathInExplorer(outputPath);
+    } catch (err) {
+      showStatus(`Error adding annotation: ${err}`, true);
+    }
+  }
+
+  function parsePoints(pointsStr: string): [number, number][] | null {
+    const cleaned = pointsStr.trim();
+    if (!cleaned) return null;
+    const pairs = cleaned
+      .split(/[\n;]+/) // allow semicolons or newlines between pairs
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (pairs.length < 2) return null;
+    const result: [number, number][] = [];
+    for (const pair of pairs) {
+      const coords = pair.split(/[, ]+/).map((c) => c.trim()).filter((c) => c.length > 0);
+      if (coords.length !== 2) return null;
+      const x = Number(coords[0]);
+      const y = Number(coords[1]);
+      if (Number.isNaN(x) || Number.isNaN(y)) return null;
+      result.push([x, y]);
+    }
+    return result;
+  }
+
+  async function handleSignatureVisual() {
+    if (!selectedSignatureFile) {
+      showStatus("Please select a PDF to sign visually.", true);
+      return;
+    }
+    if (!signaturePageInput || signaturePageInput <= 0) {
+      showStatus("Enter a valid page number.", true);
+      return;
+    }
+    const rectArray = parseRect(signatureRectInput);
+    if (!rectArray) {
+      showStatus("Invalid rect. Use format: x1, y1, x2, y2", true);
+      return;
+    }
+    const colorArray = parseColorHex(signatureColor);
+    if (!colorArray) {
+      showStatus("Invalid color. Use 6-digit hex.", true);
+      return;
+    }
+    const points = parsePoints(signaturePointsInput);
+    if (!points) {
+      showStatus("Provide at least two points as x,y; x,y;", true);
+      return;
+    }
+    const outputPath = await getSavePath("signed-visual.pdf");
+    if (!outputPath) return;
+
+    startLoading("Applying visual signature...");
+    try {
+      await invoke("add_signature_visual", {
+        path: selectedSignatureFile,
+        page: signaturePageInput,
+        rect: rectArray,
+        points,
+        color: colorArray,
+        width: signatureWidth ?? 2,
+        outputPath,
+      });
+      showStatus(`Visual signature added and saved to ${outputPath}.`, false);
+      await openPathInExplorer(outputPath);
+    } catch (err) {
+      showStatus(`Error adding visual signature: ${err}`, true);
+    }
+  }
+
+  // --- Drag and Drop ---
+
+  function handleDroppedFiles(paths: string[]) {
+    if (paths.length === 0) return;
+    const pdfs = paths.filter((p) => p.toLowerCase().endsWith(".pdf"));
+    if (pdfs.length === 0) {
+      showStatus("Only PDF files are supported for drop.", true);
+      return;
+    }
+
+    if (pdfs.length > 1) {
+      selectedMergeFiles = [...new Set([...selectedMergeFiles, ...pdfs])];
+      showStatus(`Added ${pdfs.length} PDFs to Merge section.`, false);
+    } else {
+      const path = pdfs[0];
+      // Assign to all single-file tools for convenience
+      selectedParseFile = path;
+      selectedSplitFile = path;
+      selectedExtractFile = path;
+      selectedRotateFile = path;
+      selectedDeleteFile = path;
+      selectedAnnotateFile = path;
+      selectedSignatureFile = path;
+      selectedCryptoFile = path;
+      viewerFilePath = path; // Auto-show in preview
+      showStatus(`Selected PDF: ${path.split(/[/\\]/).pop()}`, false);
+    }
+  }
+
+  onMount(async () => {
+    const unlisten = await getCurrentWebviewWindow().onFileDropEvent((event) => {
+      if (event.payload.type === "drop") {
+        handleDroppedFiles(event.payload.paths);
+      }
+    });
+    return unlisten;
+  });
 </script>
 
 <div class="app-container">
   <header class="hero">
-    <div>
+    <div class="hero-content">
       <p class="eyebrow">Workspace / PDF Ops</p>
       <h1>PDF Manager</h1>
-      <p class="subtitle">
-        Reliable desktop-grade PDF tools for merging, splitting, rotating, and inspecting files. All processing is done locally on your machine.
-      </p>
-      <div class="hero-actions">
-        <span class="chip success">Ready</span>
-        <span class="chip neutral">Local Processing</span>
-        <span class="chip ghost">No cloud upload</span>
-      </div>
+      <p class="subtitle">Reliable desktop-grade PDF tools. Files never leave your device.</p>
     </div>
-    <div class="hero-card">
-      <p class="hero-label">Quick Start</p>
-      <div class="hero-steps">
-        <div>
-          <span class="step-num">1</span>
-          <span>Select PDF(s)</span>
-        </div>
-        <div>
-          <span class="step-num">2</span>
-          <span>Pick an action</span>
-        </div>
-        <div>
-          <span class="step-num">3</span>
-          <span>Save & preview</span>
-        </div>
-      </div>
-      <p class="muted">Supports macOS, Windows, Linux. Files stay on your machine.</p>
+    <div class="hero-actions">
+      <span class="chip success">Ready</span>
+      <span class="chip neutral">Local Processing</span>
+      <button class="sponsor-button-small" on:click={openSponsor}>Sponsor</button>
     </div>
   </header>
 
-  <main class="content-grid">
-    <!-- Merge Section -->
-    <section class="card">
-      <div class="card-header">
-        <h2>🔗 Merge PDFs</h2>
-        <button
-          class="clear-button"
-          on:click={clearMergeSelection}
-          disabled={selectedMergeFiles.length === 0}
-        >
-          Clear
-        </button>
-      </div>
-      <div class="card-content">
-        <div class="button-group">
-          <button
-            class="primary-button"
-            on:click={selectMergeFiles}
-            disabled={$isLoading}
-          >
-            Select Files
-          </button>
-          <button
-            class="secondary-button"
-            on:click={handleMerge}
-            disabled={selectedMergeFiles.length < 2 || $isLoading}
-          >
-            Merge Selected
-          </button>
-        </div>
-        {#if selectedMergeFiles.length > 0}
-          <div class="files-list">
-            {#each selectedMergeFiles as file, i}
-              <div class="file-badge">
-                <span class="file-number">{i + 1}</span>
-                <span class="file-name">{file}</span>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </section>
-
-    <!-- Split and Extract Grid -->
-    <div class="tools-grid">
+  <main class="workspace">
+    <!-- Left Pane: Tools -->
+    <aside class="sidebar">
       <section class="card">
         <div class="card-header">
-          <h2>✂️ Split PDF</h2>
+          <h2>🔗 Merge PDFs</h2>
           <button
             class="clear-button"
-            on:click={clearSplitSelection}
-            disabled={!selectedSplitFile}
+            on:click={clearMergeSelection}
+            disabled={selectedMergeFiles.length === 0}
           >
             Clear
           </button>
         </div>
         <div class="card-content">
-          <button
-            class="primary-button"
-            on:click={() => selectFile("split")}
-            disabled={$isLoading}
-          >
-            Select PDF
-          </button>
-          {#if selectedSplitFile}
-            <div class="file-badge">
-              <span class="file-icon">📄</span>
-              <span class="file-name">{selectedSplitFile}</span>
+          <div class="button-group">
+            <button class="primary-button" on:click={selectMergeFiles} disabled={$isLoading}>
+              Select Files
+            </button>
+            <button
+              class="secondary-button"
+              on:click={handleMerge}
+              disabled={selectedMergeFiles.length < 2 || $isLoading}
+            >
+              Merge
+            </button>
+          </div>
+          {#if selectedMergeFiles.length > 0}
+            <div class="files-list">
+              {#each selectedMergeFiles as file, i}
+                <div class="file-badge">
+                  <span class="file-number">{i + 1}</span>
+                  <span class="file-name">{file.split(/[/\\]/).pop()}</span>
+                </div>
+              {/each}
             </div>
           {/if}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>✏️ Annotate</h2>
+          <button class="clear-button" on:click={clearAnnotateSelection} disabled={!selectedAnnotateFile}>
+            Clear
+          </button>
+        </div>
+        <div class="card-content">
+          <button class="primary-button" on:click={() => selectFile("annotate")} disabled={$isLoading}>
+            {selectedAnnotateFile ? 'Change PDF' : 'Select PDF'}
+          </button>
+          {#if selectedAnnotateFile}
+            <button class="file-badge active" on:click={() => (viewerFilePath = selectedAnnotateFile || "")} type="button">
+              <span class="file-icon">📄</span>
+              <span class="file-name">{selectedAnnotateFile.split(/[/\\]/).pop()}</span>
+            </button>
+          {/if}
           <div class="input-group">
-            <label for="split-pages">Pages to Extract</label>
-            <input
-              id="split-pages"
-              type="text"
-              bind:value={splitPagesInput}
-              disabled={$isLoading}
-              placeholder="e.g., 1, 3-5, 8"
-            />
+            <label for="annot-page">Page Number</label>
+            <input id="annot-page" type="number" min="1" bind:value={annotationPageInput} disabled={$isLoading} />
           </div>
-          <button
-            class="secondary-button full-width"
-            on:click={handleSplit}
-            disabled={!selectedSplitFile || !splitPagesInput || $isLoading}
-          >
+          <div class="input-group">
+            <label for="annot-rect">Rect (x1, y1, x2, y2)</label>
+            <div class="input-with-action">
+              <input id="annot-rect" type="text" bind:value={annotationRectInput} disabled={$isLoading} />
+              <button class="icon-button" on:click={() => openViewer("annotate", "rect")} disabled={!selectedAnnotateFile}>🎯</button>
+            </div>
+          </div>
+          <div class="input-group">
+            <label for="annot-type">Type</label>
+            <select id="annot-type" bind:value={annotationType} disabled={$isLoading}>
+              <option value="highlight">Highlight</option>
+              <option value="underline">Underline</option>
+              <option value="strikeout">Strikeout</option>
+              <option value="note">Note</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="annot-text">Contents</label>
+            <input id="annot-text" type="text" bind:value={annotationText} disabled={$isLoading} />
+          </div>
+          <button class="secondary-button full-width" on:click={handleAnnotate} disabled={!selectedAnnotateFile || !annotationRectInput || $isLoading}>
+            Add Annotation
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>✍️ Visual Signature</h2>
+          <button class="clear-button" on:click={clearSignatureSelection} disabled={!selectedSignatureFile}>
+            Clear
+          </button>
+        </div>
+        <div class="card-content">
+          <button class="primary-button" on:click={() => selectFile("signature")} disabled={$isLoading}>
+            Select PDF
+          </button>
+          <div class="input-group">
+            <label for="sig-page">Page</label>
+            <input id="sig-page" type="number" min="1" bind:value={signaturePageInput} disabled={$isLoading} />
+          </div>
+          <div class="input-group">
+            <label for="sig-rect">Rect</label>
+            <div class="input-with-action">
+              <input id="sig-rect" type="text" bind:value={signatureRectInput} disabled={$isLoading} />
+              <button class="icon-button" on:click={() => openViewer("signature", "rect")} disabled={!selectedSignatureFile}>🎯</button>
+            </div>
+          </div>
+          <div class="input-group">
+            <label for="sig-points">Points</label>
+            <div class="input-with-action">
+              <input id="sig-points" type="text" bind:value={signaturePointsInput} disabled={$isLoading} />
+              <button class="icon-button" on:click={() => openViewer("signature", "points")} disabled={!selectedSignatureFile}>✍️</button>
+            </div>
+          </div>
+          <button class="secondary-button full-width" on:click={handleSignatureVisual} disabled={!selectedSignatureFile || !signatureRectInput || !signaturePointsInput || $isLoading}>
+            Apply Visual Signature
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>🔐 Crypto Sign</h2>
+          <button class="clear-button" on:click={clearCryptoSelection} disabled={!selectedCryptoFile}>
+            Clear
+          </button>
+        </div>
+        <div class="card-content">
+          <button class="primary-button" on:click={() => selectFile("crypto")} disabled={$isLoading}>Select PDF</button>
+          <button class="secondary-button" on:click={selectCertFile} disabled={$isLoading}>Select Cert</button>
+          <div class="input-group">
+            <label for="pfx-pass">Password</label>
+            <input id="pfx-pass" type="password" bind:value={signCertPassword} disabled={$isLoading} />
+          </div>
+          <div class="input-group">
+            <label for="sign-rect-c">Rect</label>
+            <div class="input-with-action">
+              <input id="sign-rect-c" type="text" bind:value={signRectInput} disabled={$isLoading} />
+              <button class="icon-button" on:click={() => openViewer("crypto", "rect")} disabled={!selectedCryptoFile}>🎯</button>
+            </div>
+          </div>
+          <button class="secondary-button full-width" on:click={handleCryptoSign} disabled={!selectedCryptoFile || !signCertPath || !signCertPassword || $isLoading}>
+            Cryptographically Sign
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>✂️ Split & Extract</h2>
+        </div>
+        <div class="card-content">
+          <div class="input-group">
+            <label for="split-file">PDF</label>
+            <button class="primary-button" on:click={() => selectFile("split")} disabled={$isLoading}>
+              {selectedSplitFile ? 'Selected' : 'Select'}
+            </button>
+          </div>
+          <div class="input-group">
+            <label for="split-pages">Pages (e.g. 1, 3-5)</label>
+            <input id="split-pages" type="text" bind:value={splitPagesInput} disabled={$isLoading} />
+          </div>
+          <button class="secondary-button full-width" on:click={handleSplit} disabled={!selectedSplitFile || !splitPagesInput || $isLoading}>
             Split PDF
           </button>
         </div>
       </section>
+    </aside>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>DELETE</h2>
-          <button
-            class="clear-button"
-            on:click={clearDeleteSelection}
-            disabled={!selectedDeleteFile}
-          >
-            Clear
-          </button>
-        </div>
-        <div class="card-content">
-          <button
-            class="primary-button"
-            on:click={() => selectFile("delete")}
-            disabled={$isLoading}
-          >
-            Select PDF
-          </button>
-          {#if selectedDeleteFile}
-            <div class="file-badge">
-              <span class="file-icon">📄</span>
-              <span class="file-name">{selectedDeleteFile}</span>
-            </div>
-          {/if}
-          <div class="input-group">
-            <label for="delete-pages">Pages to Delete</label>
-            <input
-              id="delete-pages"
-              type="text"
-              bind:value={deletePagesInput}
-              disabled={$isLoading}
-              placeholder="e.g., 1, 3-5, 8"
-            />
-          </div>
-          <button
-            class="secondary-button full-width"
-            on:click={handleDelete}
-            disabled={!selectedDeleteFile || !deletePagesInput || $isLoading}
-          >
-            Delete Pages
-          </button>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <h2>ROTATE</h2>
-          <button
-            class="clear-button"
-            on:click={clearRotateSelection}
-            disabled={!selectedRotateFile}
-          >
-            Clear
-          </button>
-        </div>
-        <div class="card-content">
-          <button
-            class="primary-button"
-            on:click={() => selectFile("rotate")}
-            disabled={$isLoading}
-          >
-            Select PDF
-          </button>
-          {#if selectedRotateFile}
-            <div class="file-badge">
-              <span class="file-icon">📄</span>
-              <span class="file-name">{selectedRotateFile}</span>
-            </div>
-          {/if}
-          <div class="input-group">
-            <label for="rotate-pages">Pages to Rotate</label>
-            <input
-              id="rotate-pages"
-              type="text"
-              bind:value={rotatePagesInput}
-              disabled={$isLoading}
-              placeholder="e.g., 1, 3-5, 8"
-            />
-          </div>
-          <div class="button-group">
-            <button
-              class="secondary-button"
-              on:click={() => handleRotate(90)}
-              disabled={!selectedRotateFile || $isLoading}
-            >
-              90°
-            </button>
-            <button
-              class="secondary-button"
-              on:click={() => handleRotate(180)}
-              disabled={!selectedRotateFile || $isLoading}
-            >
-              180°
-            </button>
-            <button
-              class="secondary-button"
-              on:click={() => handleRotate(270)}
-              disabled={!selectedRotateFile || $isLoading}
-            >
-              270°
-            </button>
+    <!-- Right Pane: Preview -->
+    <section class="preview-pane">
+      {#if viewerFilePath}
+        <div class="preview-header">
+          <span class="preview-filename">{viewerFilePath.split(/[/\\]/).pop()}</span>
+          <div class="preview-actions">
+             <button class="icon-button-small" on:click={() => viewerPageNumber = Math.max(1, viewerPageNumber - 1)}>◀</button>
+             <input type="number" bind:value={viewerPageNumber} min="1" class="page-nav-input" />
+             <button class="icon-button-small" on:click={() => viewerPageNumber++}>▶</button>
           </div>
         </div>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <h2>📑 Extract Page</h2>
-          <button
-            class="clear-button"
-            on:click={clearExtractSelection}
-            disabled={!selectedExtractFile}
-          >
-            Clear
-          </button>
-        </div>
-        <div class="card-content">
-          <button
-            class="primary-button"
-            on:click={() => selectFile("extract")}
-            disabled={$isLoading}
-          >
-            Select PDF
-          </button>
-          {#if selectedExtractFile}
-            <div class="file-badge">
-              <span class="file-icon">📄</span>
-              <span class="file-name">{selectedExtractFile}</span>
-            </div>
-          {/if}
-          <div class="input-group">
-            <label for="extract-page">Page Number</label>
-            <input
-              id="extract-page"
-              type="number"
-              bind:value={extractPageInput}
-              min="1"
-              disabled={$isLoading}
-              placeholder="e.g., 3"
-            />
+        <PdfViewer
+          filePath={viewerFilePath}
+          pageNumber={viewerPageNumber}
+          mode={viewerMode}
+          on:select={handleViewerSelect}
+          on:close={() => (viewerFilePath = "")}
+        />
+      {:else}
+        <div class="empty-preview">
+          <div class="drop-target-visual">
+            <span class="big-icon">📄</span>
+            <h3>No PDF Selected</h3>
+            <p>Select a file from the left or drop one here to preview.</p>
           </div>
-          <button
-            class="secondary-button full-width"
-            on:click={handleExtract}
-            disabled={!selectedExtractFile || !extractPageInput || $isLoading}
-          >
-            Extract Page
-          </button>
         </div>
-      </section>
-    </div>
-
-    <!-- Parse Section (moved to bottom) -->
-    <section class="card">
-      <div class="card-header">
-        <h2>📄 Parse Metadata</h2>
-        <button
-          class="clear-button"
-          on:click={clearParseSelection}
-          disabled={!selectedParseFile}
-        >
-          Clear
-        </button>
-      </div>
-      <div class="card-content">
-        <div class="button-group">
-          <button
-            class="primary-button"
-            on:click={() => selectFile("parse")}
-            disabled={$isLoading}
-          >
-            Select PDF
-          </button>
-          <button
-            class="secondary-button"
-            on:click={handleParse}
-            disabled={!selectedParseFile || $isLoading}
-          >
-            Parse
-          </button>
-        </div>
-        {#if selectedParseFile}
-          <div class="file-badge">
-            <span class="file-icon">📎</span>
-            <span class="file-name">{selectedParseFile}</span>
-          </div>
-        {/if}
-        {#if parseResult}
-          <div class="metadata-container">
-            <h3>📋 Metadata</h3>
-            {#if Object.keys(parseResult).length > 0}
-              <div class="metadata-grid">
-                {#each Object.entries(parseResult) as [key, value]}
-                  <div class="metadata-item">
-                    <strong>{key}</strong>
-                    <span>{value}</span>
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <p class="empty-state">No metadata found in PDF</p>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      {/if}
     </section>
   </main>
 
@@ -688,202 +958,188 @@
     box-sizing: border-box;
   }
 
-  .app-container {
-    min-height: 100vh;
-    background: var(--gradient);
-    padding: 2.5rem 1.5rem 2rem;
-    font-family: "Manrope", "SF Pro Display", "Segoe UI", sans-serif;
-    color: var(--text-color);
-    position: relative;
+  :global(html, body) {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100vw;
     overflow: hidden;
   }
 
-  .app-container::before,
-  .app-container::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .app-container::before {
-    background: radial-gradient(600px circle at 10% 20%, rgba(34, 211, 238, 0.08), transparent 40%);
-  }
-
-  .app-container::after {
-    background: radial-gradient(700px circle at 90% 10%, rgba(99, 102, 241, 0.08), transparent 45%);
+  .app-container {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    background: var(--gradient);
+    font-family: "Manrope", "SF Pro Display", "Segoe UI", sans-serif;
+    color: var(--text-color);
   }
 
   .hero {
-    display: grid;
-    grid-template-columns: 1.4fr 0.9fr;
-    gap: 1.25rem;
-    align-items: stretch;
-    margin: 0 auto 2rem;
-    max-width: 1200px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .hero h1 {
-    margin: 0 0 0.35rem;
-    font-size: 2.6rem;
-    letter-spacing: -0.02em;
-  }
-
-  .subtitle {
-    color: var(--muted);
-    line-height: 1.5;
-    max-width: 720px;
-  }
-
-  .eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.8rem;
-    color: var(--primary-accent);
-    margin: 0 0 0.35rem;
-  }
-
-  .hero-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .chip {
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    border: 1px solid var(--border-color);
-    background: var(--surface);
-    color: var(--text-color);
-  }
-
-  .chip.success {
-    border-color: rgba(34, 197, 94, 0.4);
-    color: #bbf7d0;
-  }
-
-  .chip.neutral {
-    border-color: rgba(148, 163, 184, 0.35);
-  }
-
-  .chip.ghost {
-    border-color: transparent;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--muted);
-  }
-
-  .hero-card {
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-    border: 1px solid var(--border-color);
-    border-radius: 1rem;
-    padding: 1.25rem;
-    box-shadow: var(--shadow-strong);
-    backdrop-filter: blur(12px);
-  }
-
-  .hero-label {
-    margin: 0 0 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-
-  .hero-steps {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .hero-steps div {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.7rem 0.85rem;
-    border-radius: 0.75rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-color);
-  }
-
-  .step-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--primary-color);
-    color: #e0f2fe;
-    font-weight: 700;
-    font-size: 0.9rem;
-    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
-  }
-
-  .muted {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-
-  .content-grid {
-    max-width: 1200px;
-    margin: 0 auto;
-    gap: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    z-index: 1;
-  }
-
-  .tools-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-  }
-
-  .card {
-    background: var(--card-background);
-    border-radius: 1rem;
-    box-shadow: var(--shadow-strong);
-    overflow: hidden;
-    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-    border: 1px solid var(--border-color);
-    backdrop-filter: blur(12px);
-  }
-
-  .card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-  }
-
-  .card-header {
-    background: linear-gradient(120deg, rgba(37, 99, 235, 0.95), rgba(34, 211, 238, 0.7));
-    color: #e2f3ff;
-    padding: 1rem;
+    height: 64px;
+    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+  }
+
+  .hero h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    background: linear-gradient(120deg, #22d3ee, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .sidebar {
+    height: 100%;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-right: 1px solid var(--border-color);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+    scrollbar-width: auto;
+  }
+
+  .preview-pane {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow: hidden;
+  }
+
+  .preview-header {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+  }
+
+  .preview-filename {
+    font-weight: 600;
+    color: var(--primary-accent);
+  }
+
+  .preview-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .page-nav-input {
+    width: 50px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    color: white;
+    text-align: center;
+    border-radius: 4px;
+    padding: 0.2rem;
+  }
+
+  .empty-preview {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .drop-target-visual {
+    text-align: center;
+    padding: 3rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 2rem;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .big-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .card-header h2 {
+    font-size: 1rem;
     margin: 0;
-    font-size: 1.25rem;
   }
 
   .card-content {
     padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
+  }
+
+  .file-badge.active {
+    border-color: var(--primary-accent);
+    background: rgba(34, 211, 238, 0.1);
+    cursor: pointer;
+  }
+
+  .icon-button-small {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .sponsor-button-small {
+    background: linear-gradient(120deg, #ec4899, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 0.4rem 1rem;
+    border-radius: 99px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .full-width {
     width: 100%;
-    box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.02);
   }
 
   .button-group {
@@ -965,39 +1221,36 @@
     transition: border-color 0.2s, box-shadow 0.2s;
   }
 
+  .input-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.65rem;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-color);
+    box-sizing: border-box;
+  }
+
+  .input-group input[type="password"] {
+    letter-spacing: 0.08em;
+  }
+
   .input-group input:focus {
     outline: none;
     border-color: rgba(34, 211, 238, 0.7);
     box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
   }
 
-  .metadata-container {
-    margin-top: 1rem;
-  }
-
-  .metadata-grid {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .metadata-item {
-    padding: 0.9rem;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 0.65rem;
-    display: flex;
-    justify-content: space-between;
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-  }
-
   .app-footer {
-    margin-top: 2.5rem;
-    padding: 1.25rem;
+    padding: 1rem 1.5rem;
     border-top: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    background: rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
   }
 
   .sponsor-button {
@@ -1052,6 +1305,37 @@
     border-color: rgba(255, 255, 255, 0.2);
   }
 
+  .input-with-action {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .icon-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .icon-button:hover:not(:disabled) {
+    background: var(--hover-color);
+    transform: scale(1.05);
+  }
+
+  .icon-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
   @media (max-width: 768px) {
     .app-container {
       padding: 0.75rem;
@@ -1060,14 +1344,6 @@
     .hero {
       grid-template-columns: 1fr;
       gap: 1rem;
-    }
-
-    .content-grid {
-      gap: 1rem;
-    }
-
-    .tools-grid {
-      grid-template-columns: 1fr;
     }
 
     .button-group {

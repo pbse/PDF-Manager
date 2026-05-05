@@ -25,6 +25,12 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-os = "2"
 tauri-plugin-opener = "2"
+openssl = { version = "0.10", features = ["vendored"] }
+chrono = { version = "0.4", features = ["clock"] }
+hex = "0.4"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tempfile = "3.10"
