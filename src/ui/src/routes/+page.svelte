@@ -716,174 +716,201 @@
   </header>
 
   <main class="workspace">
-    <!-- Left Pane: Tools -->
-    <aside class="sidebar">
-      <section class="card">
-        <div class="card-header">
-          <h2>🔗 Merge PDFs</h2>
-          <button
-            class="clear-button"
-            on:click={clearMergeSelection}
-            disabled={selectedMergeFiles.length === 0}
-          >
-            Clear
-          </button>
+    <!-- Leftmost: Tool Switcher -->
+    <nav class="tool-nav">
+      <button class:active={activeTool === 'merge'} on:click={() => activeTool = 'merge'}>
+        <span class="nav-icon">🔗</span>
+        <span class="nav-label">Merge</span>
+      </button>
+      <button class:active={activeTool === 'annotate'} on:click={() => activeTool = 'annotate'}>
+        <span class="nav-icon">✏️</span>
+        <span class="nav-label">Annotate</span>
+      </button>
+      <button class:active={activeTool === 'signature'} on:click={() => activeTool = 'signature'}>
+        <span class="nav-icon">✍️</span>
+        <span class="nav-label">Ink</span>
+      </button>
+      <button class:active={activeTool === 'crypto'} on:click={() => activeTool = 'crypto'}>
+        <span class="nav-icon">🔐</span>
+        <span class="nav-label">Crypto</span>
+      </button>
+      <button class:active={activeTool === 'split'} on:click={() => activeTool = 'split'}>
+        <span class="nav-icon">✂️</span>
+        <span class="nav-label">Split</span>
+      </button>
+      <button class:active={activeTool === 'organize'} on:click={() => activeTool = 'organize'}>
+        <span class="nav-icon">📑</span>
+        <span class="nav-label">Pages</span>
+      </button>
+    </nav>
+
+    <!-- Middle Pane: Active Tool Settings -->
+    <aside class="tool-settings">
+      {#if activeTool === 'merge'}
+        <div class="settings-header">
+          <h2>Merge PDFs</h2>
+          <button class="clear-button-small" on:click={clearMergeSelection} disabled={selectedMergeFiles.length === 0}>Clear</button>
         </div>
-        <div class="card-content">
-          <div class="button-group">
-            <button class="primary-button" on:click={selectMergeFiles} disabled={$isLoading}>
-              Select Files
-            </button>
-            <button
-              class="secondary-button"
-              on:click={handleMerge}
-              disabled={selectedMergeFiles.length < 2 || $isLoading}
-            >
-              Merge
-            </button>
-          </div>
+        <div class="settings-body">
+          <p class="settings-hint">Combine multiple files into one.</p>
+          <button class="primary-button" on:click={selectMergeFiles}>Select Files</button>
           {#if selectedMergeFiles.length > 0}
-            <div class="files-list">
+            <div class="files-list-vertical">
               {#each selectedMergeFiles as file, i}
-                <div class="file-badge">
-                  <span class="file-number">{i + 1}</span>
-                  <span class="file-name">{file.split(/[/\\]/).pop()}</span>
+                <div class="file-item-mini">
+                  <span class="num">{i+1}</span>
+                  <button class="name" on:click={() => viewerFilePath = file}>{file.split(/[/\\]/).pop()}</button>
                 </div>
               {/each}
             </div>
           {/if}
+          <button class="action-button-main" on:click={handleMerge} disabled={selectedMergeFiles.length < 2}>
+            Generate Merged PDF
+          </button>
         </div>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>✏️ Annotate</h2>
-          <button class="clear-button" on:click={clearAnnotateSelection} disabled={!selectedAnnotateFile}>
-            Clear
-          </button>
+      {:else if activeTool === 'annotate'}
+        <div class="settings-header">
+          <h2>Annotate</h2>
         </div>
-        <div class="card-content">
-          <button class="primary-button" on:click={() => selectFile("annotate")} disabled={$isLoading}>
-            {selectedAnnotateFile ? 'Change PDF' : 'Select PDF'}
-          </button>
-          {#if selectedAnnotateFile}
-            <button class="file-badge active" on:click={() => (viewerFilePath = selectedAnnotateFile || "")} type="button">
-              <span class="file-icon">📄</span>
-              <span class="file-name">{selectedAnnotateFile.split(/[/\\]/).pop()}</span>
-            </button>
-          {/if}
+        <div class="settings-body">
+          <button class="primary-button" on:click={() => selectFile("annotate")}>Select PDF</button>
+          
           <div class="input-group">
-            <label for="annot-page">Page Number</label>
-            <input id="annot-page" type="number" min="1" bind:value={annotationPageInput} disabled={$isLoading} />
+            <label for="a-page">Page</label>
+            <input id="a-page" type="number" bind:value={annotationPageInput} />
           </div>
+
           <div class="input-group">
-            <label for="annot-rect">Rect (x1, y1, x2, y2)</label>
+            <label for="a-rect">Selection Area</label>
             <div class="input-with-action">
-              <input id="annot-rect" type="text" bind:value={annotationRectInput} disabled={$isLoading} />
-              <button class="icon-button" on:click={() => openViewer("annotate", "rect")} disabled={!selectedAnnotateFile}>🎯</button>
+              <input id="a-rect" type="text" bind:value={annotationRectInput} placeholder="x1, y1, x2, y2" />
+              <button class="icon-button" on:click={() => openViewer("annotate", "rect")}>🎯</button>
             </div>
           </div>
+
           <div class="input-group">
-            <label for="annot-type">Type</label>
-            <select id="annot-type" bind:value={annotationType} disabled={$isLoading}>
+            <label for="a-type">Type</label>
+            <select id="a-type" bind:value={annotationType}>
               <option value="highlight">Highlight</option>
               <option value="underline">Underline</option>
               <option value="strikeout">Strikeout</option>
               <option value="note">Note</option>
             </select>
           </div>
-          <div class="input-group">
-            <label for="annot-text">Contents</label>
-            <input id="annot-text" type="text" bind:value={annotationText} disabled={$isLoading} />
-          </div>
-          <button class="secondary-button full-width" on:click={handleAnnotate} disabled={!selectedAnnotateFile || !annotationRectInput || $isLoading}>
-            Add Annotation
-          </button>
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>✍️ Visual Signature</h2>
-          <button class="clear-button" on:click={clearSignatureSelection} disabled={!selectedSignatureFile}>
-            Clear
+          <div class="input-group">
+            <label for="a-text">Text Content</label>
+            <input id="a-text" type="text" bind:value={annotationText} />
+          </div>
+
+          <button class="action-button-main" on:click={handleAnnotate} disabled={!selectedAnnotateFile || !annotationRectInput}>
+            Apply Annotation
           </button>
         </div>
-        <div class="card-content">
-          <button class="primary-button" on:click={() => selectFile("signature")} disabled={$isLoading}>
-            Select PDF
-          </button>
+
+      {:else if activeTool === 'signature'}
+        <div class="settings-header">
+          <h2>Ink Signature</h2>
+        </div>
+        <div class="settings-body">
+          <button class="primary-button" on:click={() => selectFile("signature")}>Select PDF</button>
+          
           <div class="input-group">
-            <label for="sig-page">Page</label>
-            <input id="sig-page" type="number" min="1" bind:value={signaturePageInput} disabled={$isLoading} />
+            <label for="s-page">Page</label>
+            <input id="s-page" type="number" bind:value={signaturePageInput} />
           </div>
+
           <div class="input-group">
-            <label for="sig-rect">Rect</label>
+            <label for="s-rect">Visual Box</label>
             <div class="input-with-action">
-              <input id="sig-rect" type="text" bind:value={signatureRectInput} disabled={$isLoading} />
-              <button class="icon-button" on:click={() => openViewer("signature", "rect")} disabled={!selectedSignatureFile}>🎯</button>
+              <input id="s-rect" type="text" bind:value={signatureRectInput} placeholder="Bounding box" />
+              <button class="icon-button" on:click={() => openViewer("signature", "rect")}>🎯</button>
             </div>
           </div>
+
           <div class="input-group">
-            <label for="sig-points">Points</label>
+            <label for="s-points">Signature Path</label>
             <div class="input-with-action">
-              <input id="sig-points" type="text" bind:value={signaturePointsInput} disabled={$isLoading} />
-              <button class="icon-button" on:click={() => openViewer("signature", "points")} disabled={!selectedSignatureFile}>✍️</button>
+              <input id="s-points" type="text" bind:value={signaturePointsInput} placeholder="Drawn points" />
+              <button class="icon-button" on:click={() => openViewer("signature", "points")}>✍️</button>
             </div>
           </div>
-          <button class="secondary-button full-width" on:click={handleSignatureVisual} disabled={!selectedSignatureFile || !signatureRectInput || !signaturePointsInput || $isLoading}>
-            Apply Visual Signature
-          </button>
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>🔐 Crypto Sign</h2>
-          <button class="clear-button" on:click={clearCryptoSelection} disabled={!selectedCryptoFile}>
-            Clear
+          <button class="action-button-main" on:click={handleSignatureVisual} disabled={!selectedSignatureFile || !signatureRectInput || !signaturePointsInput}>
+            Place Visual Signature
           </button>
         </div>
-        <div class="card-content">
-          <button class="primary-button" on:click={() => selectFile("crypto")} disabled={$isLoading}>Select PDF</button>
-          <button class="secondary-button" on:click={selectCertFile} disabled={$isLoading}>Select Cert</button>
+
+      {:else if activeTool === 'crypto'}
+        <div class="settings-header">
+          <h2>Crypto Signing</h2>
+        </div>
+        <div class="settings-body">
+          <button class="primary-button" on:click={() => selectFile("crypto")}>Select PDF</button>
+          <button class="secondary-button" on:click={selectCertFile}>{signCertPath ? 'Change Cert' : 'Select PFX/P12'}</button>
+
+          {#if signCertPath}
+            <p class="cert-status">✅ {signCertPath.split(/[/\\]/).pop()}</p>
+          {/if}
+
           <div class="input-group">
-            <label for="pfx-pass">Password</label>
-            <input id="pfx-pass" type="password" bind:value={signCertPassword} disabled={$isLoading} />
+            <label for="c-pass">Cert Password</label>
+            <input id="c-pass" type="password" bind:value={signCertPassword} />
           </div>
+
           <div class="input-group">
-            <label for="sign-rect-c">Rect</label>
+            <label for="c-rect">Signature Area</label>
             <div class="input-with-action">
-              <input id="sign-rect-c" type="text" bind:value={signRectInput} disabled={$isLoading} />
-              <button class="icon-button" on:click={() => openViewer("crypto", "rect")} disabled={!selectedCryptoFile}>🎯</button>
+              <input id="c-rect" type="text" bind:value={signRectInput} />
+              <button class="icon-button" on:click={() => openViewer("crypto", "rect")}>🎯</button>
             </div>
           </div>
-          <button class="secondary-button full-width" on:click={handleCryptoSign} disabled={!selectedCryptoFile || !signCertPath || !signCertPassword || $isLoading}>
-            Cryptographically Sign
-          </button>
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>✂️ Split & Extract</h2>
-        </div>
-        <div class="card-content">
-          <div class="input-group">
-            <label for="split-file">PDF</label>
-            <button class="primary-button" on:click={() => selectFile("split")} disabled={$isLoading}>
-              {selectedSplitFile ? 'Selected' : 'Select'}
-            </button>
-          </div>
-          <div class="input-group">
-            <label for="split-pages">Pages (e.g. 1, 3-5)</label>
-            <input id="split-pages" type="text" bind:value={splitPagesInput} disabled={$isLoading} />
-          </div>
-          <button class="secondary-button full-width" on:click={handleSplit} disabled={!selectedSplitFile || !splitPagesInput || $isLoading}>
-            Split PDF
+          <button class="action-button-main" on:click={handleCryptoSign} disabled={!selectedCryptoFile || !signCertPath || !signCertPassword}>
+            Finalize & Sign
           </button>
         </div>
-      </section>
+
+      {:else if activeTool === 'split'}
+        <div class="settings-header">
+          <h2>Split & Extract</h2>
+        </div>
+        <div class="settings-body">
+          <button class="primary-button" on:click={() => selectFile("split")}>Select PDF</button>
+          <div class="input-group">
+            <label for="sp-pages">Pages (e.g. 1, 3-5, 8)</label>
+            <input id="sp-pages" type="text" bind:value={splitPagesInput} />
+          </div>
+          <button class="action-button-main" on:click={handleSplit} disabled={!selectedSplitFile || !splitPagesInput}>
+            Extract Specific Pages
+          </button>
+        </div>
+
+      {:else if activeTool === 'organize'}
+        <div class="settings-header">
+          <h2>Page Operations</h2>
+        </div>
+        <div class="settings-body">
+          <button class="primary-button" on:click={() => selectFile("rotate")}>Select PDF</button>
+          
+          <div class="tool-section">
+             <h3>Rotate</h3>
+             <input type="text" bind:value={rotatePagesInput} placeholder="Pages to rotate" />
+             <div class="button-row">
+               <button on:click={() => handleRotate(90)}>90°</button>
+               <button on:click={() => handleRotate(180)}>180°</button>
+               <button on:click={() => handleRotate(270)}>270°</button>
+             </div>
+          </div>
+
+          <div class="tool-section">
+            <h3>Delete</h3>
+            <input type="text" bind:value={deletePagesInput} placeholder="Pages to delete" />
+            <button class="danger-button" on:click={handleDelete}>Remove Pages</button>
+          </div>
+        </div>
+      {/if}
     </aside>
 
     <!-- Right Pane: Preview -->
@@ -908,8 +935,8 @@
         <div class="empty-preview">
           <div class="drop-target-visual">
             <span class="big-icon">📄</span>
-            <h3>No PDF Selected</h3>
-            <p>Select a file from the left or drop one here to preview.</p>
+            <h3>Workspace</h3>
+            <p>Select a tool and file to begin.</p>
           </div>
         </div>
       {/if}
@@ -1005,31 +1032,191 @@
   .workspace {
     flex: 1;
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 80px 320px 1fr;
     min-height: 0;
     overflow: hidden;
-    position: relative;
   }
 
-  .sidebar {
-    height: 100%;
-    overflow-y: auto;
+  /* 1. Tool Nav (Leftmost) */
+  .tool-nav {
+    background: rgba(0, 0, 0, 0.4);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .tool-nav button {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 0.75rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .tool-nav button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+  }
+
+  .tool-nav button.active {
+    background: rgba(34, 211, 238, 0.15);
+    color: var(--primary-accent);
+  }
+
+  .nav-icon {
+    font-size: 1.5rem;
+  }
+
+  .nav-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* 2. Tool Settings (Middle) */
+  .tool-settings {
     background: rgba(0, 0, 0, 0.2);
     border-right: 1px solid var(--border-color);
-    padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 2.5rem;
-    scrollbar-width: auto;
+    overflow-y: auto;
   }
 
-  .preview-pane {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.4);
+  .settings-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .settings-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .settings-body {
+    padding: 1.25rem;
     display: flex;
     flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .settings-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: -0.5rem 0 0.5rem;
+  }
+
+  .action-button-main {
+    margin-top: 1rem;
+    padding: 0.85rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+  }
+
+  .action-button-main:disabled {
+    background: var(--disabled-color);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* 3. Preview Pane (Right) */
+  .preview-pane {
+    background: rgba(0, 0, 0, 0.3);
     padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .files-list-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+  }
+
+  .file-item-mini {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .file-item-mini .num {
+    font-size: 0.7rem;
+    color: var(--muted);
+    width: 15px;
+  }
+
+  .file-item-mini .name {
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .file-item-mini .name:hover {
+    color: var(--primary-accent);
+  }
+
+  .tool-section {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+  }
+
+  .tool-section h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    color: var(--muted);
+  }
+
+  .button-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .danger-button {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .cert-status {
+    font-size: 0.8rem;
+    color: #4ade80;
+    margin: -1rem 0 0;
   }
 
   .preview-header {
