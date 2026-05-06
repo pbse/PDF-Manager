@@ -2,6 +2,7 @@
   import { onMount, tick, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { browser } from "$app/environment";
+  import Tesseract from "tesseract.js";
 
   let {
     filePath = "",
@@ -10,6 +11,7 @@
     previewRect = null,
     previewStrokes = [],
     previewColor = "red",
+    ocrTrigger = 0,
     onselect,
     onclear,
     onclose,
@@ -23,6 +25,7 @@
     previewRect?: number[] | null;
     previewStrokes?: [number, number][][];
     previewColor?: string;
+    ocrTrigger?: number;
     onselect?: (detail: any) => void;
     onclear?: () => void;
     onclose?: () => void;
@@ -39,6 +42,7 @@
   let scale = 1.5;
   let loading = $state(false);
   let error = $state("");
+  let ocrProcessing = $state(false);
 
   let isDrawing = $state(false);
   let currentRect = $state({ x1: 0, y1: 0, x2: 0, y2: 0 });
@@ -49,6 +53,35 @@
   let lastRenderedPage = -1;
   let currentRenderTask: any = null;
   let isRendering = false;
+
+  $effect(() => {
+    if (ocrTrigger > 0 && canvas && browser) {
+      performOcr();
+    }
+  });
+
+  async function performOcr() {
+    if (!canvas) return;
+    ocrProcessing = true;
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const { data: { text } } = await Tesseract.recognize(dataUrl, "eng", {
+        logger: m => console.log(m)
+      });
+      
+      const defaultPath = `page_${pageNumber}_ocr.txt`;
+      const outputPath = await invoke<string | null>("save_file_dialog", { defaultPath });
+      
+      if (outputPath && text) {
+        await invoke("write_text_file", { path: outputPath, contents: text });
+        await invoke("shell_open", { filePath: outputPath });
+      }
+    } catch (e: any) {
+      error = "OCR Failed: " + e.toString();
+    } finally {
+      ocrProcessing = false;
+    }
+  }
 
   async function initPdfJs() {
     if (!browser || pdfjs) return;
@@ -160,11 +193,13 @@
 </script>
 
 <div class="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-300 dark:border-slate-800 flex flex-col outline-none overflow-hidden max-h-[85vh] transition-colors duration-300" bind:this={container} onkeydown={handleKeyDown} tabindex="0">
-  {#if loading}
+  {#if loading || ocrProcessing}
     <div class="absolute inset-0 z-50 flex items-center justify-center bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm transition-colors duration-300">
       <div class="flex flex-col items-center gap-3">
         <div class="w-10 h-10 border-4 border-blue-100 dark:border-blue-900 border-t-blue-600 rounded-full animate-spin"></div>
-        <span class="text-sm font-semibold text-slate-700 dark:text-slate-400 tracking-tight">Optimizing view...</span>
+        <span class="text-sm font-semibold text-slate-700 dark:text-slate-400 tracking-tight">
+          {ocrProcessing ? "Performing Local OCR..." : "Optimizing view..."}
+        </span>
       </div>
     </div>
   {:else if error}
@@ -195,7 +230,7 @@
           {/if}
         {:else if previewStrokes.length > 0 && !isDrawing}
           {#each previewStrokes as stroke}
-            <polyline points={stroke.map(pt => { const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]); return `${cx},${cy}`; }).join(' ')} fill="none" stroke={previewColor} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points={stroke.map((pt: [number, number]) => { const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]); return `${cx},${cy}`; }).join(' ')} fill="none" stroke={previewColor} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           {/each}
         {/if}
       </svg>

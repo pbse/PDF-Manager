@@ -28,6 +28,7 @@ tauri-plugin-opener = "2"
 openssl = { version = "0.10", features = ["vendored"] }
 chrono = { version = "0.4", features = ["clock"] }
 hex = "0.4"
+pdf-extract = "0.10.0"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

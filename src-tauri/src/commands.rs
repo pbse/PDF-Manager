@@ -117,6 +117,16 @@ pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| format!("Failed to read file at {}: {}", path, e))
 }
 
+#[command]
+pub fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    std::fs::rename(&old_path, &new_path).map_err(|e| {
+        format!(
+            "Failed to rename file from '{}' to '{}': {}",
+            old_path, new_path, e
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

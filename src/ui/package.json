@@ -34,7 +34,9 @@
 		]
 	},
 	"dependencies": {
+		"@mlc-ai/web-llm": "^0.2.83",
 		"@tauri-apps/api": "^2.4.0",
-		"pdfjs-dist": "^4.10.38"
+		"pdfjs-dist": "^4.10.38",
+		"tesseract.js": "^7.0.0"
 	}
 }

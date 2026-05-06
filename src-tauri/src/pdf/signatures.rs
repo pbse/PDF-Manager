@@ -222,12 +222,12 @@ pub fn sign_pdf_pfx(
         .map_err(|e| format!("Failed to read PFX '{}': {}", pfx_path, e))?;
     let parsed = Pkcs12::from_der(&pfx_bytes)
         .map_err(|e| format!("Invalid PFX: {}", e))?
-        .parse(&pfx_password)
+        .parse2(&pfx_password)
         .map_err(|e| format!("Failed to parse PFX: {}", e))?;
-    let pkey: PKey<openssl::pkey::Private> = parsed.pkey;
-    let cert: X509 = parsed.cert;
+    let pkey: PKey<openssl::pkey::Private> = parsed.pkey.ok_or("No private key in PFX")?;
+    let cert: X509 = parsed.cert.ok_or("No certificate in PFX")?;
     let mut chain_stack = Stack::new().map_err(|e| e.to_string())?;
-    if let Some(chain) = parsed.chain {
+    if let Some(chain) = parsed.ca {
         for c in chain {
             chain_stack.push(c).map_err(|e| e.to_string())?;
         }

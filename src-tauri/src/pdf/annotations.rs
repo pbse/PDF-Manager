@@ -154,9 +154,20 @@ pub fn add_annotation(
             }
             d
         }
+        "redact" | "blackout" => {
+            dictionary! {
+                "Type" => "Annot",
+                "Subtype" => "Square",
+                "Rect" => rect_obj.clone(),
+                "C" => Object::Array(vec![0f32.into(), 0f32.into(), 0f32.into()]),
+                "IC" => Object::Array(vec![0f32.into(), 0f32.into(), 0f32.into()]),
+                "BS" => dictionary! { "W" => 0_i64 },
+                "F" => 4_i64,
+            }
+        }
         _ => {
             return Err(format!(
-                "Unsupported annotation type '{}'. Allowed: highlight, underline, strikeout, note",
+                "Unsupported annotation type '{}'. Allowed: highlight, underline, strikeout, note, redact",
                 kind
             ))
         }

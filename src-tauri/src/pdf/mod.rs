@@ -9,6 +9,8 @@ pub mod splitter;
 pub mod rotator;
 
 pub mod remover;
+pub mod sanitize;
+pub mod convert;
 
 // Shared helpers only compiled for tests
 #[cfg(test)]
@@ -26,6 +28,10 @@ pub use parser::parse_pdf;
 pub use splitter::split_pdf;
 pub use rotator::rotate_pdf;
 pub use remover::delete_pages;
+pub use sanitize::sanitize_pdf;
+pub use convert::pdf_to_text;
+pub use convert::pdf_to_text_string;
+pub use convert::write_text_file;
 pub use annotations::add_annotation;
 pub use signatures::add_signature_visual;
 pub use signatures::sign_pdf_pfx;
