@@ -1,31 +1,50 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher, tick } from "svelte";
+  import { onMount, tick, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { browser } from "$app/environment";
 
-  export let filePath: string;
-  export let pageNumber: number = 1;
-  export let mode: "rect" | "points" = "rect";
+  let {
+    filePath = "",
+    pageNumber = 1,
+    mode = "view",
+    previewRect = null,
+    previewStrokes = [],
+    previewColor = "red",
+    onselect,
+    onclear,
+    onclose,
+    ondone,
+    onprev,
+    onnext
+  } = $props<{
+    filePath?: string;
+    pageNumber?: number;
+    mode?: "rect" | "points" | "view";
+    previewRect?: number[] | null;
+    previewStrokes?: [number, number][][];
+    previewColor?: string;
+    onselect?: (detail: any) => void;
+    onclear?: () => void;
+    onclose?: () => void;
+    ondone?: () => void;
+    onprev?: () => void;
+    onnext?: () => void;
+  }>();
 
-  const dispatch = createEventDispatcher();
-
-  let canvas: HTMLCanvasElement;
-  let container: HTMLDivElement;
-  let pdfjs: any = null;
-  let pdfDoc: any = null;
-  let viewport: any = null;
+  let canvas: HTMLCanvasElement | undefined = $state();
+  let container: HTMLDivElement | undefined = $state();
+  let pdfjs: any = $state(null);
+  let pdfDoc: any = $state(null);
+  let viewport: any = $state(null);
   let scale = 1.5;
-  let loading = false;
-  let error = "";
+  let loading = $state(false);
+  let error = $state("");
 
-  // Selection state
-  let isDrawing = false;
-  let startX = 0;
-  let startY = 0;
-  let currentRect = { x1: 0, y1: 0, x2: 0, y2: 0 };
-  let points: [number, number][] = [];
+  let isDrawing = $state(false);
+  let currentRect = $state({ x1: 0, y1: 0, x2: 0, y2: 0 });
+  let strokes = $state<[number, number][][]>([]);
+  let currentStroke = $state<[number, number][]>([]);
 
-  // Guard variables to prevent infinite loops
   let lastLoadedPath = "";
   let lastRenderedPage = -1;
   let currentRenderTask: any = null;
@@ -41,300 +60,170 @@
         import.meta.url
       ).toString();
     } catch (err: any) {
-      error = "Failed to initialize PDF.js: " + err.toString();
+      error = "Failed to initialize: " + err.toString();
     }
   }
 
   async function loadDocument() {
     if (!pdfjs || !filePath || filePath === lastLoadedPath) return;
-    loading = true;
-    error = "";
+    if (pdfDoc) { try { await pdfDoc.destroy(); } catch (e) {} pdfDoc = null; }
+    loading = true; error = "";
     try {
       const bytes = await invoke<number[]>("read_file_bytes", { path: filePath });
       const uint8Array = new Uint8Array(bytes);
       const loadingTask = pdfjs.getDocument({ data: uint8Array });
       pdfDoc = await loadingTask.promise;
-      lastLoadedPath = filePath;
-      lastRenderedPage = -1; // Force re-render of current page
+      lastLoadedPath = filePath; lastRenderedPage = -1;
       await renderPage();
-    } catch (err: any) {
-      error = "Failed to load document: " + err.toString();
-    } finally {
-      loading = false;
-    }
+    } catch (err: any) { error = "Load failed: " + err.toString(); } finally { loading = false; }
   }
 
   async function renderPage() {
     if (!pdfDoc || !canvas || (pageNumber === lastRenderedPage && !loading)) return;
-
-    // If already rendering, cancel and wait for it to finish completely
-    if (currentRenderTask) {
-      try {
-        currentRenderTask.cancel();
-        // Crucial: Await the rejection of the previous task to ensure canvas is released
-        await currentRenderTask.promise;
-      } catch (e) {
-        // Ignore expected cancellation error
-      }
-      currentRenderTask = null;
-    }
-
-    // Secondary lock to prevent race conditions during the await above
+    if (currentRenderTask) { try { currentRenderTask.cancel(); await currentRenderTask.promise; } catch (e) {} currentRenderTask = null; }
     if (isRendering) return;
     isRendering = true;
-
     try {
-      await tick(); // Ensure DOM is settled
+      await tick();
       const page = await pdfDoc.getPage(pageNumber);
       const context = canvas.getContext("2d");
-      if (!context) {
-        isRendering = false;
-        return;
-      }
-
+      if (!context) { isRendering = false; return; }
       viewport = page.getViewport({ scale });
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-
-      currentRenderTask = page.render(renderContext);
+      canvas.height = viewport.height; canvas.width = viewport.width;
+      currentRenderTask = page.render({ canvasContext: context, viewport });
       await currentRenderTask.promise;
-
       lastRenderedPage = pageNumber;
-    } catch (err: any) {
-      if (err.name === "RenderingCancelledException") {
-        // Normal cancellation, do nothing
-      } else {
-        error = "Rendering failed: " + err.toString();
-      }
-    } finally {
-      currentRenderTask = null;
-      isRendering = false;
-    }
+    } catch (err: any) { if (err.name !== "RenderingCancelledException") error = "Render failed: " + err.toString(); } finally { currentRenderTask = null; isRendering = false; }
   }
 
-  // --- Reactivity ---
-  
-  // 1. Initialize PDF.js once
-  onMount(async () => {
-    await initPdfJs();
-  });
-
-  // 2. Load document when filePath or pdfjs changes
-  $: if (pdfjs && filePath !== lastLoadedPath) {
-    loadDocument();
-  }
-
-  // 3. Render page when pageNumber or pdfDoc changes
-  $: if (pdfDoc && (pageNumber !== lastRenderedPage)) {
-    renderPage();
-  }
+  onMount(async () => { await initPdfJs(); });
+  $effect(() => { if (pdfjs && filePath !== lastLoadedPath) loadDocument(); });
+  $effect(() => { if (pdfDoc && (pageNumber !== lastRenderedPage)) renderPage(); });
+  $effect(() => { if (!isDrawing) strokes = [...previewStrokes]; });
 
   function handleMouseDown(e: MouseEvent) {
-    if (loading || error || !viewport) return;
+    if (loading || error || !viewport || !canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (mode === "rect") {
-      isDrawing = true;
-      startX = x;
-      startY = y;
-      currentRect = { x1: x, y1: y, x2: x, y2: y };
-    } else {
-      const [pdfX, pdfY] = viewport.convertToPdfPoint(x, y);
-      points = [...points, [pdfX, pdfY]];
+    const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+    if (mode === "rect") { isDrawing = true; currentRect = { x1: x, y1: y, x2: x, y2: y }; }
+    else if (mode === "points") { 
+      isDrawing = true; 
+      const [pdfX, pdfY] = viewport.convertToPdfPoint(x, y); 
+      currentStroke = [[pdfX, pdfY]]; 
     }
   }
 
   function handleMouseMove(e: MouseEvent) {
-    if (!isDrawing) return;
+    if (!isDrawing || !canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    currentRect = { ...currentRect, x2: x, y2: y };
+    const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+    if (mode === "rect") currentRect = { ...currentRect, x2: x, y2: y };
+    else if (mode === "points") {
+      const [pdfX, pdfY] = viewport.convertToPdfPoint(x, y);
+      const last = currentStroke[currentStroke.length - 1];
+      if (last) {
+        const [lvx, lvy] = viewport.convertToViewportPoint(last[0], last[1]);
+        if (Math.sqrt(Math.pow(x - lvx, 2) + Math.pow(y - lvy, 2)) > 2) currentStroke = [...currentStroke, [pdfX, pdfY]];
+      }
+    }
   }
 
   function handleMouseUp() {
-    if (mode === "rect" && isDrawing) {
-      isDrawing = false;
-      // Convert to PDF coordinates
-      const [pdfX1, pdfY1] = viewport.convertToPdfPoint(currentRect.x1, currentRect.y1);
-      const [pdfX2, pdfY2] = viewport.convertToPdfPoint(currentRect.x2, currentRect.y2);
-      
-      // lopdf expects [x1, y1, x2, y2]
-      // pdf.js convertToPdfPoint returns [x, y] in PDF space (0,0 is bottom-left usually)
-      dispatch("select", { rect: [pdfX1, pdfY1, pdfX2, pdfY2] });
+    if (!isDrawing) return;
+    isDrawing = false;
+    if (mode === "rect" && viewport) {
+      const [px1, py1] = viewport.convertToPdfPoint(currentRect.x1, currentRect.y1);
+      const [px2, py2] = viewport.convertToPdfPoint(currentRect.x2, currentRect.y2);
+      onselect?.({
+        rect: [parseFloat(px1.toFixed(2)), parseFloat(py1.toFixed(2)), parseFloat(px2.toFixed(2)), parseFloat(py2.toFixed(2))]
+      });
+    } else if (mode === "points") {
+      if (currentStroke.length > 0) {
+        strokes = [...strokes, currentStroke];
+        currentStroke = [];
+        onselect?.({
+          strokes: strokes.map(s => s.map(p => [parseFloat(p[0].toFixed(2)), parseFloat(p[1].toFixed(2))]))
+        });
+      }
     }
   }
 
-  function confirmPoints() {
-    if (mode === "points" && points.length >= 2) {
-      // For ink, we also need a bounding box. 
-      // We can calculate it from points or just ask user to draw it.
-      // Usually, the signature tool in this app asks for BOTH rect and points.
-      // Let's simplify: the first 2 points define the rect roughly? No.
-      // Let's just emit the points and let the user draw the rect later or vice-versa.
-      dispatch("select", { points });
-    }
+  function clear() { strokes = []; currentStroke = []; currentRect = { x1: 0, y1: 0, x2: 0, y2: 0 }; onclear?.(); }
+  function undo() { if (mode === "points" && strokes.length > 0) { strokes = strokes.slice(0, -1); onselect?.({ strokes: strokes.map(s => s.map(p => [parseFloat(p[0].toFixed(2)), parseFloat(p[1].toFixed(2))])) }); } }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape") onclose?.();
+    else if (e.key === "z" && (e.ctrlKey || e.metaKey)) undo();
   }
 
-  function clear() {
-    points = [];
-    currentRect = { x1: 0, y1: 0, x2: 0, y2: 0 };
-  }
+  onDestroy(async () => { if (pdfDoc) try { await pdfDoc.destroy(); } catch (e) {} });
 </script>
 
-<div class="viewer-container" bind:this={container}>
+<div class="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-300 dark:border-slate-800 flex flex-col outline-none overflow-hidden max-h-[85vh] transition-colors duration-300" bind:this={container} onkeydown={handleKeyDown} tabindex="0">
   {#if loading}
-    <div class="overlay">Loading PDF...</div>
+    <div class="absolute inset-0 z-50 flex items-center justify-center bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm transition-colors duration-300">
+      <div class="flex flex-col items-center gap-3">
+        <div class="w-10 h-10 border-4 border-blue-100 dark:border-blue-900 border-t-blue-600 rounded-full animate-spin"></div>
+        <span class="text-sm font-semibold text-slate-700 dark:text-slate-400 tracking-tight">Optimizing view...</span>
+      </div>
+    </div>
   {:else if error}
-    <div class="overlay error">{error}</div>
+    <div class="absolute inset-0 z-50 flex items-center justify-center bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 p-8 text-center font-bold">{error}</div>
   {/if}
 
-  <div class="canvas-wrapper">
-    <canvas
-      bind:this={canvas}
-      on:mousedown={handleMouseDown}
-      on:mousemove={handleMouseMove}
-      on:mouseup={handleMouseUp}
-    ></canvas>
+  <div class="relative mx-auto p-8 overflow-auto transition-colors duration-300">
+    <canvas bind:this={canvas} onmousedown={handleMouseDown} onmousemove={handleMouseMove} onmouseup={handleMouseUp} onmouseleave={handleMouseUp} class="bg-white shadow-md ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm cursor-crosshair max-w-full transition-all duration-300"></canvas>
 
     {#if isDrawing && mode === "rect"}
-      <div
-        class="selection-rect"
-        style="
-          left: {Math.min(currentRect.x1, currentRect.x2)}px;
-          top: {Math.min(currentRect.y1, currentRect.y2)}px;
-          width: {Math.abs(currentRect.x2 - currentRect.x1)}px;
-          height: {Math.abs(currentRect.y2 - currentRect.y1)}px;
-        "
-      ></div>
+      <div class="absolute border-2 border-blue-600 bg-blue-600/20 pointer-events-none transition-all z-20" style="left: {Math.min(currentRect.x1, currentRect.x2)+32}px; top: {Math.min(currentRect.y1, currentRect.y2)+32}px; width: {Math.abs(currentRect.x2 - currentRect.x1)}px; height: {Math.abs(currentRect.y2 - currentRect.y1)}px;"></div>
     {/if}
 
-    {#if mode === "points"}
-      {#each points as pt}
-        <!-- We need to convert back to canvas pixels to show them -->
-        {@const [cx, cy] = viewport ? viewport.convertToViewportPoint(pt[0], pt[1]) : [0,0]}
-        <div class="point" style="left: {cx}px; top: {cy}px;"></div>
-      {/each}
-      
-      {#if points.length > 0}
-        <svg class="points-svg" width={canvas?.width} height={canvas?.height}>
-           <polyline
-            points={points.map(pt => {
-              const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]);
-              return `${cx},${cy}`;
-            }).join(' ')}
-            fill="none"
-            stroke="red"
-            stroke-width="2"
-          />
-        </svg>
-      {/if}
+    {#if previewRect && viewport && !isDrawing}
+      {@const [vx1, vy1] = viewport.convertToViewportPoint(previewRect[0], previewRect[1])}
+      {@const [vx2, vy2] = viewport.convertToViewportPoint(previewRect[2], previewRect[3])}
+      <div class="absolute border-2 pointer-events-none z-10 rounded-sm transition-colors duration-300" style="left: {Math.min(vx1, vx2)+32}px; top: {Math.min(vy1, vy2)+32}px; width: {Math.abs(vx2 - vx1)}px; height: {Math.abs(vy2 - vy1)}px; border-color: {previewColor}; background: {previewColor}33;"></div>
+    {/if}
+
+    {#if viewport}
+      <svg class="absolute top-0 left-0 pointer-events-none p-8 z-10" width={canvas?.width ? canvas.width + 64 : 64} height={canvas?.height ? canvas.height + 64 : 64}>
+        {#if mode === "points"}
+          {#each strokes as stroke}
+            <polyline points={stroke.map(pt => { const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]); return `${cx},${cy}`; }).join(' ')} fill="none" stroke={previewColor} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          {/each}
+          {#if currentStroke.length > 0}
+            <polyline points={currentStroke.map(pt => { const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]); return `${cx},${cy}`; }).join(' ')} fill="none" stroke={previewColor} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          {/if}
+        {:else if previewStrokes.length > 0 && !isDrawing}
+          {#each previewStrokes as stroke}
+            <polyline points={stroke.map(pt => { const [cx, cy] = viewport.convertToViewportPoint(pt[0], pt[1]); return `${cx},${cy}`; }).join(' ')} fill="none" stroke={previewColor} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          {/each}
+        {/if}
+      </svg>
     {/if}
   </div>
 
-  <div class="viewer-controls">
-    <span>Page {pageNumber}</span>
-    <button on:click={clear}>Clear</button>
-    {#if mode === "points"}
-      <button on:click={confirmPoints} disabled={points.length < 2}>Confirm Points</button>
-    {/if}
-    <button on:click={() => dispatch('close')}>Close</button>
+  <div class="shrink-0 px-8 py-4 bg-slate-100 dark:bg-slate-900/50 border-t border-slate-300 dark:border-slate-800 flex items-center justify-between transition-colors duration-300">
+    <div class="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-300 dark:border-slate-700 p-1 shadow-sm transition-colors duration-300">
+       <button onclick={onprev} disabled={pageNumber <= 1} class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md disabled:opacity-20 transition-colors">◀</button>
+       <span class="px-3 text-xs font-bold text-slate-800 dark:text-slate-300 min-w-[4rem] text-center uppercase tracking-widest transition-colors">Page {pageNumber}</span>
+       <button onclick={onnext} class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors">▶</button>
+    </div>
+    
+    <div class="flex items-center gap-2">
+       {#if mode === 'points'}
+         <button onclick={undo} disabled={strokes.length === 0} class="px-4 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-all disabled:opacity-20 shadow-sm transition-colors duration-300 uppercase tracking-tighter">Undo Stroke</button>
+       {/if}
+       <button onclick={clear} class="px-4 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:text-red-600 rounded-lg transition-all shadow-sm transition-colors duration-300 uppercase tracking-tighter">Reset</button>
+       <div class="w-[1px] h-6 bg-slate-300 dark:border-slate-700 mx-1 transition-colors duration-300"></div>
+       {#if mode !== 'view'}
+         <button onclick={ondone} class="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all shadow-md shadow-blue-500/20 uppercase tracking-tight">Lock & Finish</button>
+       {:else}
+         <button onclick={onclose} class="px-5 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-all shadow-lg uppercase tracking-tight transition-colors duration-300">Close Preview</button>
+       {/if}
+    </div>
   </div>
 </div>
 
 <style>
-  .viewer-container {
-    position: relative;
-    background: #1e1e1e;
-    border-radius: 8px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-height: 80vh;
-    overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .canvas-wrapper {
-    position: relative;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    cursor: crosshair;
-  }
-
-  canvas {
-    display: block;
-    max-width: 100%;
-  }
-
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.5);
-    z-index: 10;
-    color: white;
-  }
-
-  .error {
-    color: #ff4444;
-  }
-
-  .selection-rect {
-    position: absolute;
-    border: 2px solid #22d3ee;
-    background: rgba(34, 211, 238, 0.2);
-    pointer-events: none;
-  }
-
-  .point {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background: red;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-  }
-
-  .points-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-  }
-
-  .viewer-controls {
-    margin-top: 1rem;
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  button {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  /* Local component styles - minimalist approach */
 </style>

@@ -48,6 +48,7 @@ fn main() {
             commands::save_file_dialog,
             commands::get_os_type,
             commands::shell_open,
+            commands::reveal_in_folder,
             commands::read_file_bytes,
             // Ensure these names match exactly what's imported above
         ])

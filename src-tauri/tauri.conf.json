@@ -54,10 +54,13 @@
         "app:ipc:save_file_dialog",
         "app:ipc:get_os_type",
         "app:ipc:shell_open",
+        "app:ipc:reveal_in_folder",
+        "app:ipc:read_file_bytes",
         "plugin:dialog:open",
         "plugin:dialog:save",
         "plugin:os:type",
-        "plugin:shell:open"
+        "plugin:opener:open-url",
+        "plugin:opener:reveal-item-in-dir"
       ]
     }
   }

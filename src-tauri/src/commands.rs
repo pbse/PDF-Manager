@@ -102,6 +102,17 @@ pub async fn shell_open(
 }
 
 #[command]
+pub async fn reveal_in_folder(
+    app_handle: AppHandle,
+    file_path: String,
+) -> Result<(), String> {
+    app_handle
+        .opener()
+        .reveal_item_in_dir(file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
 pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| format!("Failed to read file at {}: {}", path, e))
 }

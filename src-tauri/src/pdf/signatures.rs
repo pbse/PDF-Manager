@@ -33,7 +33,7 @@ pub fn add_signature_visual(
     path: &str,
     page: u32,
     rect: [f32; 4],
-    points: Vec<[f32; 2]>,
+    strokes: Vec<Vec<[f32; 2]>>,
     color: Option<[f32; 3]>,
     width: Option<f32>,
     output_path: &str,
@@ -41,8 +41,8 @@ pub fn add_signature_visual(
     if page == 0 {
         return Err("Page number must be 1-based.".to_string());
     }
-    if points.len() < 2 {
-        return Err("Signature requires at least two points.".to_string());
+    if strokes.is_empty() || strokes.iter().all(|s| s.is_empty()) {
+        return Err("Signature requires at least one point.".to_string());
     }
     let input_path = Path::new(path);
     if !input_path.exists() {
@@ -74,18 +74,22 @@ pub fn add_signature_visual(
     let rect = normalize_rect(rect);
     let rect_obj = Object::Array(vec![rect[0].into(), rect[1].into(), rect[2].into(), rect[3].into()]);
 
-    // Build InkList
-    let mut ink_array = Vec::with_capacity(points.len());
-    for pt in &points {
-        ink_array.push(pt[0].into());
-        ink_array.push(pt[1].into());
+    // Build InkList (array of strokes)
+    let mut ink_list = Vec::with_capacity(strokes.len());
+    for points in &strokes {
+        let mut ink_array = Vec::with_capacity(points.len() * 2);
+        for pt in points {
+            ink_array.push(pt[0].into());
+            ink_array.push(pt[1].into());
+        }
+        ink_list.push(Object::Array(ink_array));
     }
 
     let mut annot = dictionary! {
         "Type" => "Annot",
         "Subtype" => "Ink",
         "Rect" => rect_obj,
-        "InkList" => Object::Array(vec![Object::Array(ink_array)]),
+        "InkList" => Object::Array(ink_list),
         "C" => color_array(color),
         "Border" => Object::Array(vec![0.into(), 0.into(), width.unwrap_or(2.0).max(0.1).into()]),
         "F" => 4_i64, // Print flag
@@ -95,30 +99,33 @@ pub fn add_signature_visual(
     // Appearance stream so the ink is visible across viewers
     let x0 = rect[0];
     let y0 = rect[1];
-    let width = (rect[2] - rect[0]).max(1.0);
-    let height = (rect[3] - rect[1]).max(1.0);
+    let bbox_width = (rect[2] - rect[0]).max(1.0);
+    let bbox_height = (rect[3] - rect[1]).max(1.0);
     let mut ap_stream = String::new();
     // set color and stroke width
-    let stroke_width = width.max(0.1);
+    let stroke_width = width.unwrap_or(2.0).max(0.1);
     let col = color.unwrap_or([0.1, 0.4, 1.0]);
     ap_stream.push_str(&format!("{:.3} {:.3} {:.3} RG\n", col[0], col[1], col[2]));
     ap_stream.push_str(&format!("{:.2} w\n", stroke_width));
-    // move/line commands (adjusted to origin)
-    if let Some(first) = points.first() {
-        ap_stream.push_str(&format!(
-            "{:.2} {:.2} m\n",
-            first[0] - x0,
-            first[1] - y0
-        ));
-        for p in points.iter().skip(1) {
-            ap_stream.push_str(&format!("{:.2} {:.2} l\n", p[0] - x0, p[1] - y0));
+    
+    // Process each stroke for the appearance stream
+    for points in &strokes {
+        if let Some(first) = points.first() {
+            ap_stream.push_str(&format!(
+                "{:.2} {:.2} m\n",
+                first[0] - x0,
+                first[1] - y0
+            ));
+            for p in points.iter().skip(1) {
+                ap_stream.push_str(&format!("{:.2} {:.2} l\n", p[0] - x0, p[1] - y0));
+            }
+            ap_stream.push_str("S\n");
         }
-        ap_stream.push_str("S\n");
     }
     let ap_dict = dictionary! {
         "Type" => "XObject",
         "Subtype" => "Form",
-        "BBox" => Object::Array(vec![0.into(), 0.into(), width.into(), height.into()]),
+        "BBox" => Object::Array(vec![0.into(), 0.into(), bbox_width.into(), bbox_height.into()]),
         "Resources" => dictionary! {},
     };
     let ap_ref = doc.add_object(lopdf::Stream::new(ap_dict, ap_stream.into_bytes()));
