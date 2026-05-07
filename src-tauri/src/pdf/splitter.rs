@@ -153,7 +153,7 @@ mod tests {
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
-            let unique_suffix = format!("{}", test_name);
+            let unique_suffix = format!("{}_{}", test_name, uuid::Uuid::new_v4());
 
             // Place artifacts in target/ directory
             let base_data_dir = PathBuf::from("target/test_data_splitter");

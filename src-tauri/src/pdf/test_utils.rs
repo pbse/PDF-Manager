@@ -60,3 +60,18 @@ pub fn create_minimal_pdf(
     doc.save(file_path)?;
     Ok(())
 }
+
+#[cfg(test)]
+pub fn setup_unique_paths(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let test_dir = std::env::temp_dir().join(format!("pdf_test_{}_{}", name, uuid::Uuid::new_v4()));
+    let output_dir = test_dir.join("output");
+    std::fs::create_dir_all(&output_dir).unwrap();
+    (test_dir, output_dir)
+}
+
+#[cfg(test)]
+pub fn teardown_unique_paths(test_dir: &std::path::Path, _output_dir: &std::path::Path) {
+    if test_dir.exists() {
+        std::fs::remove_dir_all(test_dir).ok();
+    }
+}

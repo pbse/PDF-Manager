@@ -203,6 +203,49 @@ pub fn add_annotation(
     Ok(())
 }
 
+#[tauri::command]
+pub fn delete_annotation(path: &str, annot_id: (u32, u16), output_path: &str) -> Result<(), String> {
+    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
+    
+    // 1. Remove from all page Annots arrays
+    let page_ids: Vec<_> = doc.get_pages().values().cloned().collect();
+    for page_id in page_ids {
+        if let Ok(Object::Dictionary(mut page)) = doc.get_object_mut(page_id).cloned() {
+            if let Ok(Object::Array(ref mut annots)) = page.get_mut(b"Annots") {
+                annots.retain(|a| {
+                    if let Ok(id) = a.as_reference() {
+                        id != annot_id
+                    } else {
+                        true
+                    }
+                });
+                doc.objects.insert(page_id, Object::Dictionary(page));
+            }
+        }
+    }
+    
+    // 2. Remove the object itself
+    doc.objects.remove(&annot_id);
+    
+    doc.save(output_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_annotation_contents(path: &str, annot_id: (u32, u16), new_contents: String, output_path: &str) -> Result<(), String> {
+    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
+    
+    if let Ok(Object::Dictionary(mut annot)) = doc.get_object_mut(annot_id).cloned() {
+        annot.set("Contents", Object::string_literal(new_contents));
+        doc.objects.insert(annot_id, Object::Dictionary(annot));
+    } else {
+        return Err("Annotation not found or not a dictionary".to_string());
+    }
+    
+    doc.save(output_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

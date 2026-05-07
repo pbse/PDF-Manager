@@ -34,3 +34,38 @@ pub fn sanitize_pdf(path: &str, output_path: &str) -> Result<(), String> {
     doc.save(output_path).map_err(|e| format!("Failed to save sanitized PDF: {}", e))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pdf::test_utils::{create_minimal_pdf, setup_unique_paths, teardown_unique_paths};
+    use lopdf::{Document, Object};
+
+    #[test]
+    fn test_sanitize_pdf_success() {
+        let (test_dir, output_dir) = setup_unique_paths("sanitize");
+        let input_path = test_dir.join("input.pdf");
+        let output_path = output_dir.join("output.pdf");
+
+        create_minimal_pdf(input_path.to_str().unwrap(), 1, "SanitizeTest").unwrap();
+
+        // Add some metadata to be removed
+        let mut doc = Document::load(input_path.to_str().unwrap()).unwrap();
+        doc.trailer.set("Info", Object::Dictionary(lopdf::dictionary! { "Title" => "Dirty PDF" }));
+        doc.save(input_path.to_str().unwrap()).unwrap();
+
+        let result = sanitize_pdf(
+            input_path.to_str().unwrap(),
+            output_path.to_str().unwrap()
+        );
+
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        // Verify metadata is gone
+        let doc_after = Document::load(output_path.to_str().unwrap()).unwrap();
+        assert!(doc_after.trailer.get(b"Info").is_err());
+
+        teardown_unique_paths(&test_dir, &output_dir);
+    }
+}

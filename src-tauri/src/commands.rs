@@ -1,5 +1,6 @@
 use tauri::{command, AppHandle};
-use tokio::sync::oneshot; // Use oneshot channels for async callback results
+use tokio::sync::oneshot;
+use sha2::Digest;
 
 // Import necessary Extension Traits and Types
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -110,6 +111,23 @@ pub async fn reveal_in_folder(
         .opener()
         .reveal_item_in_dir(file_path)
         .map_err(|e| e.to_string())
+}
+
+#[command]
+pub fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read text file: {}", e))
+}
+
+#[command]
+pub fn get_file_hash(path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let hash = sha2::Sha256::digest(&bytes);
+    Ok(format!("{:x}", hash))
+}
+
+#[command]
+pub fn write_file_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    std::fs::write(&path, bytes).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 #[command]

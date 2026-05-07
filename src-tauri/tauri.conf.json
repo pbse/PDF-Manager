@@ -1,5 +1,5 @@
 {
-  "productName": "pdf-manager",
+  "productName": "Pinnacle",
   "version": "1.0.0",
   "build": {
     "beforeDevCommand": "npm run dev --prefix ./src/ui",
@@ -7,7 +7,7 @@
     "devUrl": "http://localhost:5173",
     "frontendDist": "../src/ui/build"
   },
-  "identifier": "com.yourdomain.pdfmanager",
+  "identifier": "com.pinnacle.app",
   "app": {
     "security": {
       "csp": null
@@ -18,9 +18,10 @@
         "width": 900,
         "height": 700,
         "resizable": true,
+        "transparent": true,
         "minWidth": 600,
         "minHeight": 500,
-        "title": "PDF Manager"
+        "title": "Pinnacle"
       }
     ],
     "withGlobalTauri": true

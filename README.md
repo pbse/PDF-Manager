@@ -1,127 +1,70 @@
-# PDF-Manager
-All in one PDF Manager App
-A cross-platform, efficient PDF manager built using Rust + Tauri. It can parse, merge, split, and extract pages from PDF files with minimal memory usage and exceptional performance.
+# Pinnacle - Local Document Intelligence
 
-## Features
-- **Parse PDFs:** Quickly extract text, metadata, and analyze PDF structures.
-- **Merge PDFs:** Combine multiple PDF files into one.
-- **Split PDFs:** Break PDFs into separate pages or defined page ranges.
-- **Extract Pages:** Export individual pages into standalone PDFs.
+**Pinnacle** is a professional-grade, local-first document intelligence platform designed for privacy-conscious users and enterprises. Built with Rust and Tauri, it provides exceptional performance for complex PDF operations without ever letting your data leave your device.
+
+## Why Pinnacle?
+- **Privacy First:** All processing happens 100% locally on your machine.
+- **High Performance:** Powered by a Rust backend for lightning-fast document manipulation.
+- **Intelligence Built-in:** Automated metadata extraction, content analysis, and smart organization.
+- **Comprehensive Toolset:** From basic merging to advanced cryptographic signatures.
+
+## Core Capabilities
+- **Smart Analysis:** Extract text, metadata, and structural insights automatically.
+- **Precise Manipulation:** Merge, split, reorder, and rotate with ease.
+- **Secure Annotations:** Highlight, comment, and markup documents natively.
+- **Professional Signatures:** Add visual signatures or cryptographic PFX-based digital signatures.
+- **Advanced Security:** Flatten annotations, redact sensitive info, and manage PDF encryption.
+- **Form Management:** Efficiently fill and extract data from PDF forms.
 
 ## Supported Platforms
-- ✅ macOS
-- ✅ Windows
-- ✅ Linux
-- ✅ iPadOS (via WebAssembly/Web App deployment)
+- ✅ **macOS** (Silicon & Intel)
+- ✅ **Windows** (10/11)
+- ✅ **Linux**
+- ✅ **iPadOS/iOS** (Native & WebAssembly)
 
 ---
 
-## Prerequisites
+## Quick Start for Developers
 
-Ensure these tools are installed:
+### Prerequisites
+- [Rust](https://rustup.rs/) (Stable)
+- [Node.js](https://nodejs.org/) (LTS)
+- [npm](https://pnpm.io/) (or pnpm/yarn)
 
-- [Rust](https://rustup.rs/) (stable channel recommended)
-- [Node.js](https://nodejs.org/) (LTS recommended)
-- [pnpm](https://pnpm.io/) or npm (pnpm recommended for speed)
+### Setup
+1. **Clone & Install**
+   ```sh
+   git clone https://github.com/pbse/PDF-Manager.git
+   cd PDF-Manager
+   npm install
+   ```
 
-Check installations:
-```sh
-rustc --version
-node -v
-pnpm -v  # or npm -v
-```
+2. **Run in Development**
+   ```sh
+   npm run tauri dev
+   ```
 
----
-
-## Installation and Setup
-
-Clone the repository and navigate to the directory:
-```sh
-git clone https://github.com/pbse/PDF-Manager.git
-cd PDF-Manager
-```
-
-Install frontend dependencies:
-```sh
-pnpm install  # or npm install
-```
-
-Install Rust dependencies (managed automatically by cargo):
-```sh
-cd src-tauri
-cargo build
-```
+3. **Run Backend Tests**
+   ```sh
+   cd src-tauri
+   cargo test
+   ```
 
 ---
 
-## Development
+## Project Structure
+- `src/ui/`: Svelte 5 frontend with Tailwind CSS and Runes for state management.
+- `src-tauri/src/pdf/`: High-performance Rust modules for PDF logic (using `lopdf`).
+- `src-tauri/tauri.conf.json`: Application configuration and security allowlists.
 
-Run the application locally in development mode:
-```sh
-pnpm tauri dev  # or npm run tauri dev
-```
-
----
-
-## Building and Distributing
-
-Create optimized production builds for your platform:
-
-```sh
-pnpm tauri build  # or npm run tauri build
-```
-
-The built app will appear in:
-- **macOS:** `src-tauri/target/release/bundle/dmg/`
-- **Windows:** `src-tauri/target/release/bundle/msi/`
-- **Linux:** `src-tauri/target/release/bundle/deb/` or AppImage
-
-### Platform targets and scripts
-
-Desktop (macOS/Windows/Linux):
-- macOS (run on macOS): `pnpm run build:mac`
-- Windows (run on Windows): `pnpm run build:win` (requires MSVC toolchain)
-- Linux (run on Linux): `pnpm run build:linux` (requires WebKit2GTK and related deps per Tauri docs)
-
-Mobile (requires platform SDKs + Rust targets + Tauri mobile tooling):
-- iOS/iPadOS (on macOS with Xcode, Rust targets `aarch64-apple-ios` + `x86_64-apple-ios`, and cocoapods):
-  - Dev: `pnpm run dev:ios`
-  - Build: `pnpm run build:ios` (signing/provisioning required for device/TestFlight)
-- Android (with Android SDK/NDK, Java 17, Rust targets `aarch64-linux-android` + `armv7-linux-androideabi`):
-  - Dev: `pnpm run dev:android`
-  - Build: `pnpm run build:android` (configure keystore for release)
-
-Notes:
-- Cross-compiling desktop apps is best done on the target OS (or via CI runners) because of native toolchain requirements.
-- Tauri mobile commands (`tauri ios/android ...`) assume you’ve run the corresponding `tauri ios init` / `tauri android init` and have the platform SDKs installed.
-
----
-
-## Code Structure Overview
-- **`src/ui/src`**: User interface built with Svelte (recommended), or alternatively React/Vue.
-- **`src-tauri/`**: Tauri app configuration.
-- **`src-tauri/src/pdf/`**: Core Rust logic for efficient PDF manipulation.
-
----
-
-## Dependencies
-- **Rust PDF manipulation:** [`lopdf`](https://crates.io/crates/lopdf)
-- **Tauri:** [Official Docs](https://tauri.app/)
-- **UI Framework:** [Svelte](https://svelte.dev/), [Vue.js](https://vuejs.org/), or [React](https://reactjs.org/) (choose one according to preference)
-
----
-
-## Contributing
-Contributions welcome! Follow standard GitHub workflows:
-- Fork repository, make changes, open pull request.
-
----
+## Documentation
+- [Backend Architecture](./src-tauri/src/pdf/README.md) (Work in progress)
+- [UI State Management](./src/ui/src/lib/state/README.md) (Work in progress)
 
 ## License
-This project is open-sourced under the MIT License. See `LICENSE` file for details.
+MIT License - See `LICENSE` for details.
 
 ---
 
 ## Maintainer
-- [Prashant Bansal](mailto:dev@prashantb.me)
-- GitHub: [pbse](https://github.com/pbse)
+[Prashant Bansal](mailto:dev@prashantb.me)

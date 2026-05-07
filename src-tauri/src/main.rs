@@ -8,8 +8,8 @@ mod pdf;
 
 // Use the re-exported functions directly from the 'pdf' module
 use crate::pdf::{
-    add_annotation, add_signature_visual, delete_pages, extract_pdf_page, merge_pdfs, parse_pdf,
-    rotate_pdf, sign_pdf_pfx, split_pdf, verify_signatures, sanitize_pdf, pdf_to_text, pdf_to_text_string, write_text_file,
+    add_annotation, delete_annotation, update_annotation_contents, add_signature_visual, delete_pages, extract_pdf_page, merge_pdfs, parse_pdf,
+    rotate_pdf, sign_pdf_pfx, split_pdf, verify_signatures, sanitize_pdf, reorder_pages, compress_pdf, decrypt_pdf, flatten_annotations, images_to_pdf, add_watermark, start_folder_watcher, forensic_redact, compare_pdfs_text, update_metadata, batch_update_metadata, get_pdf_outline, set_pdf_outline, get_annotations, get_form_fields, set_form_fields, pdf_to_text, pdf_to_text_string, write_text_file, markdown_to_pdf, generate_briefing,
 };
 
 fn main() {
@@ -41,18 +41,28 @@ fn main() {
             rotate_pdf,
             delete_pages,
             add_annotation,
+            delete_annotation,
+            update_annotation_contents,
             add_signature_visual,
             sign_pdf_pfx,
             verify_signatures,
             sanitize_pdf,
-            pdf_to_text,
-            pdf_to_text_string,
-            write_text_file,
+            reorder_pages,
+            compress_pdf,
+            decrypt_pdf,
+            flatten_annotations,
+            images_to_pdf,
+            add_watermark, start_folder_watcher, forensic_redact, markdown_to_pdf, generate_briefing, compare_pdfs_text, update_metadata, batch_update_metadata, get_pdf_outline, set_pdf_outline, get_annotations, get_form_fields, set_form_fields, pdf_to_text, pdf_to_text_string, write_text_file,
+
+
             commands::open_file_dialog,
             commands::save_file_dialog,
             commands::get_os_type,
             commands::shell_open,
             commands::reveal_in_folder,
+            commands::read_text_file,
+            commands::get_file_hash,
+            commands::write_file_bytes,
             commands::read_file_bytes,
             commands::rename_file,
             // Ensure these names match exactly what's imported above

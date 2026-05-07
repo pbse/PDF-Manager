@@ -1,37 +1,37 @@
 <script lang="ts">
-    import { isLoading, statusMessage, isError, lastSuccessPath } from '$lib/stores';
+    import { appState } from '$lib/state/appState.svelte';
     import { invoke } from '@tauri-apps/api/core';
 
     async function openFile() {
-        if ($lastSuccessPath) {
-            await invoke('shell_open', { filePath: $lastSuccessPath });
+        if (appState.lastSuccessPath) {
+            await invoke('shell_open', { filePath: appState.lastSuccessPath });
         }
     }
 
     async function revealInFolder() {
-        if ($lastSuccessPath) {
-            await invoke('reveal_in_folder', { path: $lastSuccessPath });
+        if (appState.lastSuccessPath) {
+            await invoke('reveal_in_folder', { path: appState.lastSuccessPath });
         }
     }
 </script>
 
-{#if $statusMessage}
+{#if appState.statusMessage}
     <div class="fixed bottom-0 left-0 right-0 z-[100] px-4 py-3 flex items-center justify-between transition-all duration-300
-        {$isError ? 'bg-red-600 text-white' : 'bg-slate-900 dark:bg-blue-600 text-white shadow-lg border-t border-white/10'}">
+        {appState.isError ? 'bg-red-600 text-white' : 'bg-slate-900 dark:bg-blue-600 text-white shadow-lg border-t border-white/10'}">
         
         <div class="flex items-center gap-4">
-            {#if $isLoading}
+            {#if appState.isLoading}
                 <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            {:else if $isError}
+            {:else if appState.isError}
                 <span class="text-lg">⚠️</span>
             {:else}
                 <span class="text-lg">✅</span>
             {/if}
             
-            <p class="text-sm font-medium tracking-tight">{$statusMessage}</p>
+            <p class="text-sm font-medium tracking-tight">{appState.statusMessage}</p>
         </div>
 
-        {#if $lastSuccessPath && !$isLoading && !$isError}
+        {#if appState.lastSuccessPath && !appState.isLoading && !appState.isError}
             <div class="flex gap-2">
                 <button 
                     onclick={openFile}

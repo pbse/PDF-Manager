@@ -1,10 +1,17 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { appState } from '$lib/state/appState.svelte';
 
   let { children } = $props();
 
   let isDark = $state(false);
+
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--accent-color', appState.accentColor);
+    }
+  });
 
   function toggleDarkMode() {
     isDark = !isDark;
