@@ -26,3 +26,7 @@ src/ui/.svelte-kit/
 src/ui/dist/
 src/ui/.svelte/
 src/ui/.svelte-kit/
+
+# Gemini Instructions
+GEMINI.md
+
