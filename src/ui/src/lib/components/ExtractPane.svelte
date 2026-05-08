@@ -151,7 +151,10 @@
 
           <div class="shrink-0 space-y-3">
             <div class="flex items-center justify-between px-2">
-              <button onclick={handleResearchReport} class="text-[8px] font-black text-blue-500 uppercase tracking-tighter">
+              <button 
+                onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : handleResearchReport()} 
+                class="text-[8px] font-black text-blue-500 uppercase tracking-tighter"
+              >
                 {!pdfState.viewerFilePath ? 'Select PDF' : 'Export MD Report'}
               </button>
               <select bind:value={chatState.aiProvider} class="bg-transparent text-[8px] font-black text-slate-400 uppercase tracking-tighter outline-none cursor-pointer">
@@ -211,11 +214,11 @@
           <section class="space-y-4">
             <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 dark:border-slate-800 pb-2">Advanced Intelligence</h3>
             <div class="grid grid-cols-2 gap-3">
-                <button onclick={handleScanReferences} disabled={!pdfState.viewerFilePath} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
+                <button onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : handleScanReferences()} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
                   <div class="text-lg mb-1 group-hover:scale-110 transition-transform">🔗</div>
                   <div class="text-[9px] font-black uppercase text-slate-500">{!pdfState.viewerFilePath ? 'Select PDF' : 'Scan URLs'}</div>
                 </button>
-                <button onclick={() => pdfState.ocrTrigger = Date.now()} disabled={!pdfState.viewerFilePath} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
+                <button onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : (pdfState.ocrTrigger = Date.now())} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
                   <div class="text-lg mb-1 group-hover:scale-110 transition-transform">👁️</div>
                   <div class="text-[9px] font-black uppercase text-slate-500">{!pdfState.viewerFilePath ? 'Select PDF' : 'Force OCR'}</div>
                 </button>

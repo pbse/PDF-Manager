@@ -119,4 +119,17 @@ test.describe('Pinnacle E2E Flows', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('input[placeholder="Type a command or search..."]')).not.toBeVisible({ timeout: 10000 });
   });
+
+  test('should verify Select PDF in Assistant works', async ({ page }) => {
+    // 1. Switch to Assistant tool
+    await page.click('button[title="Assistant"]', { force: true });
+    
+    // 2. Click the "Select PDF" button
+    const selectPdfBtn = page.locator('button:has-text("Select PDF")');
+    await expect(selectPdfBtn).toBeVisible({ timeout: 10000 });
+    await selectPdfBtn.click({ force: true });
+
+    // 3. Verify that the button text changes to "Export MD Report" after selection (mocked to /mock/test.pdf)
+    await expect(page.locator('button:has-text("Export MD Report")')).toBeVisible({ timeout: 10000 });
+  });
 });

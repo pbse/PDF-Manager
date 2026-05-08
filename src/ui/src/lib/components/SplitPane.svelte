@@ -65,14 +65,21 @@
         <label for="split-pages" class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter transition-colors">Page Numbers (e.g. 1, 3-5)</label>
         <input id="split-pages" type="text" bind:value={pdfState.splitPagesInput} class="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm" />
       </div>
-      <button onclick={handleSplit} disabled={!pdfState.selectedSplitFile || !pdfState.splitPagesInput} class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs uppercase tracking-widest transition-colors shadow-md shadow-blue-500/10">
+      <button 
+        onclick={() => !pdfState.selectedSplitFile ? pdfState.selectFile('split') : handleSplit()} 
+        disabled={pdfState.selectedSplitFile && !pdfState.splitPagesInput} 
+        class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs uppercase tracking-widest transition-colors shadow-md shadow-blue-500/10"
+      >
         {!pdfState.selectedSplitFile ? 'Select PDF' : !pdfState.splitPagesInput ? 'Enter Range' : 'Save Range'}
       </button>
     </div>
 
     <div class="space-y-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 transition-colors">
       <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors">Extract Current</h3>
-      <button onclick={handleExtract} disabled={!pdfState.selectedSplitFile} class="w-full py-2 border border-blue-600 text-blue-600 dark:text-blue-400 rounded font-bold text-xs uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all">
+      <button 
+        onclick={() => !pdfState.selectedSplitFile ? pdfState.selectFile('split') : handleExtract()} 
+        class="w-full py-2 border border-blue-600 text-blue-600 dark:text-blue-400 rounded font-bold text-xs uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+      >
         {!pdfState.selectedSplitFile ? 'Select PDF' : `Save Page ${pdfState.viewerPageNumber}`}
       </button>
     </div>

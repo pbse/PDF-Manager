@@ -134,10 +134,17 @@
       </label>
 
       <div class="flex gap-2">
-        <button onclick={handleSignatureVisual} disabled={!pdfState.selectedSignatureFile || pdfState.signatureStrokes.length === 0} class="flex-[2] py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest transition-all shadow-xl hover:scale-[1.02]">
+        <button 
+          onclick={() => !pdfState.selectedSignatureFile ? selectFile() : handleSignatureVisual()} 
+          disabled={pdfState.selectedSignatureFile && pdfState.signatureStrokes.length === 0} 
+          class="flex-[2] py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest transition-all shadow-xl hover:scale-[1.02]"
+        >
           {!pdfState.selectedSignatureFile ? 'Select PDF' : pdfState.signatureStrokes.length === 0 ? 'Draw Signature' : 'Apply Signature'}
         </button>
-        <button onclick={handleSecureShare} disabled={!pdfState.selectedSignatureFile} class="flex-1 py-3 border border-blue-600 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all shadow-md">
+        <button 
+          onclick={() => !pdfState.selectedSignatureFile ? selectFile() : handleSecureShare()} 
+          class="flex-1 py-3 border border-blue-600 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all shadow-md"
+        >
           {!pdfState.selectedSignatureFile ? 'Select PDF' : 'Share'}
         </button>
       </div>

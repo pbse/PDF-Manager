@@ -53,15 +53,15 @@
 <ToolPane title="Forms" subtitle="Interactive Filler">
   <div class="space-y-6">
     <button 
-      onclick={() => pdfState.selectFile('split')} 
+      onclick={() => pdfState.selectFile('extract')} 
       class="w-full py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold truncate transition-colors"
     >
       {pdfState.viewerFilePath ? pdfState.viewerFilePath.split(/[/\\]/).pop() : 'Select PDF Form'}
     </button>
 
     <button 
-      onclick={scanFields} 
-      disabled={!pdfState.viewerFilePath || isScanning}
+      onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : scanFields()} 
+      disabled={pdfState.viewerFilePath && isScanning}
       class="w-full py-2 bg-blue-600 text-white rounded font-bold text-[10px] uppercase tracking-widest shadow-md"
     >
       {!pdfState.viewerFilePath ? 'Select PDF' : isScanning ? 'Scanning...' : 'Scan for Fields'}
@@ -95,7 +95,10 @@
           {/each}
         </div>
 
-        <button onclick={handleSaveForm} class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl">
+        <button 
+          onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : handleSaveForm()} 
+          class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl"
+        >
           {!pdfState.viewerFilePath ? 'Select PDF' : 'Export Filled PDF'}
         </button>
       </div>

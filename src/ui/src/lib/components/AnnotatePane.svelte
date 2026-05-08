@@ -122,9 +122,8 @@
       </label>
 
       <button 
-        onclick={() => !pdfState.annotationRectInput ? openViewer('rect') : handleAnnotate()} 
-        disabled={!pdfState.selectedAnnotateFile} 
-        class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+        onclick={() => !pdfState.selectedAnnotateFile ? selectFile() : !pdfState.annotationRectInput ? openViewer('rect') : handleAnnotate()} 
+        class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02]"
       >
         {!pdfState.selectedAnnotateFile ? 'Select PDF' : !pdfState.annotationRectInput ? 'Enter Selection Mode' : 'Apply Annotation'}
       </button>
