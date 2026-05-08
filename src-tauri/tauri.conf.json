@@ -1,6 +1,6 @@
 {
   "productName": "Pinnacle",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "build": {
     "beforeDevCommand": "npm run dev --prefix ./src/ui",
     "beforeBuildCommand": "npm run build --prefix ./src/ui",

@@ -1,6 +1,6 @@
 {
     "name": "pinnacle",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Cross-platform PDF management app built with Rust and Tauri",
     "scripts": {
         "tauri": "tauri",
