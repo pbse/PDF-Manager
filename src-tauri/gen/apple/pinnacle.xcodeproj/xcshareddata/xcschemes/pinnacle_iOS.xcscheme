@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9A1A8C63539B00B0B6B3C5CE"
-               BuildableName = "pdf-manager_iOS.app"
-               BlueprintName = "pdf-manager_iOS"
-               ReferencedContainer = "container:pdf-manager.xcodeproj">
+               BuildableName = "pinnacle_iOS.app"
+               BlueprintName = "pinnacle_iOS"
+               ReferencedContainer = "container:pinnacle.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9A1A8C63539B00B0B6B3C5CE"
-            BuildableName = "pdf-manager_iOS.app"
-            BlueprintName = "pdf-manager_iOS"
-            ReferencedContainer = "container:pdf-manager.xcodeproj">
+            BuildableName = "pinnacle_iOS.app"
+            BlueprintName = "pinnacle_iOS"
+            ReferencedContainer = "container:pinnacle.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -70,9 +70,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9A1A8C63539B00B0B6B3C5CE"
-            BuildableName = "pdf-manager_iOS.app"
-            BlueprintName = "pdf-manager_iOS"
-            ReferencedContainer = "container:pdf-manager.xcodeproj">
+            BuildableName = "pinnacle_iOS.app"
+            BlueprintName = "pinnacle_iOS"
+            ReferencedContainer = "container:pinnacle.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -101,9 +101,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9A1A8C63539B00B0B6B3C5CE"
-            BuildableName = "pdf-manager_iOS.app"
-            BlueprintName = "pdf-manager_iOS"
-            ReferencedContainer = "container:pdf-manager.xcodeproj">
+            BuildableName = "pinnacle_iOS.app"
+            BlueprintName = "pinnacle_iOS"
+            ReferencedContainer = "container:pinnacle.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>

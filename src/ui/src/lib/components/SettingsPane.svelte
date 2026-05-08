@@ -26,7 +26,7 @@
 
   async function handleBackup() {
     const json = await historyState.exportLibrary();
-    const outputPath = await invoke<string | null>("save_file_dialog", { defaultPath: "pdf_manager_backup.json" });
+    const outputPath = await invoke<string | null>("save_file_dialog", { defaultPath: "pinnacle_backup.json" });
     if (outputPath) {
       await invoke("write_text_file", { path: outputPath, contents: json });
       appState.showStatus("Library backup saved.", false);
@@ -151,7 +151,7 @@
       </div>
 
     <div class="pt-8 text-center">
-      <p class="text-[10px] text-slate-400 font-medium">PDF Manager v1.0.0</p>
+      <p class="text-[10px] text-slate-400 font-medium">Pinnacle v1.0.0</p>
       <p class="text-[9px] text-slate-500 mt-1">Made with ❤️ for Privacy</p>
     </div>
   </div>

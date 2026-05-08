@@ -91,7 +91,7 @@ export class AppDatabase extends Dexie {
   notes!: Table<NoteRecord>;
 
   constructor() {
-    super('PdfManagerDB');
+    super('PinnacleDB');
     this.version(9).stores({
       documents: '++id, path, name, timestamp, *tags, collectionId, hash',
       chats: '++id, docPath, timestamp',

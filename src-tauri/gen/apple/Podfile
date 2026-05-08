@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'pdf-manager_iOS' do
+target 'pinnacle_iOS' do
 platform :ios, '13.0'
-  # Pods for pdf-manager_iOS
+  # Pods for pinnacle_iOS
 end
 
-target 'pdf-manager_macOS' do
+target 'pinnacle_macOS' do
 platform :osx, '11.0'
-  # Pods for pdf-manager_macOS
+  # Pods for pinnacle_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

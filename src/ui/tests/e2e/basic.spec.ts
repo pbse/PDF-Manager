@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('PDF Manager UI', () => {
+test.describe('Pinnacle UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem('onboarding_complete', 'true');

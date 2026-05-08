@@ -34,8 +34,8 @@
 ### Setup
 1. **Clone & Install**
    ```sh
-   git clone https://github.com/pbse/PDF-Manager.git
-   cd PDF-Manager
+   git clone https://github.com/pbse/Pinnacle.git
+   cd Pinnacle
    npm install
    ```
 

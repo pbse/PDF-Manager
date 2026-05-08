@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/capabilities.json",
   "identifier": "default",
-  "description": "Default permissions for the PDF Manager application.",
+  "description": "Default permissions for the Pinnacle application.",
   "windows": ["main"],
   "permissions": [
     "core:default",

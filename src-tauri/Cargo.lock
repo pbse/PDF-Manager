@@ -3611,7 +3611,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdf-manager"
+name = "pinnacle"
 version = "1.0.0"
 dependencies = [
  "chrono",

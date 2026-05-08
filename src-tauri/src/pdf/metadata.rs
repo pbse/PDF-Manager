@@ -27,7 +27,7 @@ pub fn update_metadata(
         if let Some(a) = author { info.set("Author", Object::String(a.into_bytes(), StringFormat::Literal)); }
         if let Some(s) = subject { info.set("Subject", Object::String(s.into_bytes(), StringFormat::Literal)); }
         if let Some(k) = keywords { info.set("Keywords", Object::String(k.into_bytes(), StringFormat::Literal)); }
-        info.set("Producer", Object::String("PDF Manager World-Class Assistant".into(), StringFormat::Literal));
+        info.set("Producer", Object::String("Pinnacle World-Class Assistant".into(), StringFormat::Literal));
     }
 
     doc.save(output_path).map_err(|e| format!("Failed to save: {}", e))?;

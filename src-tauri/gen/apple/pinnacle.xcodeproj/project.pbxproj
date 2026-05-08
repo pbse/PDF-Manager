@@ -28,7 +28,7 @@
 		1CE26D74CC4619D5FE48EDF5 /* extractor.rs */ = {isa = PBXFileReference; path = extractor.rs; sourceTree = "<group>"; };
 		287F87B55C6B1549A82BCDCA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2E81A90B3DDDBDE0D7C42C85 /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
-		410B18FC1F40CD1DAE8AA2C2 /* pdf-manager_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "pdf-manager_iOS.entitlements"; sourceTree = "<group>"; };
+		410B18FC1F40CD1DAE8AA2C2 /* pinnacle_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "pinnacle_iOS.entitlements"; sourceTree = "<group>"; };
 		429D2CDEC7ABB12547CF77A7 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		4D5B4A3BB2D30B9EC1D6D8FE /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		5706AEDE63D9BE60FBB718DE /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -40,7 +40,7 @@
 		935023B4346E7E7A54E328AD /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		95FCCDB5A9998CC40BDFFB21 /* merger.rs */ = {isa = PBXFileReference; path = merger.rs; sourceTree = "<group>"; };
 		AB5BEA262AF34FAA0AC1AEFA /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
-		C9665A8C58A08A819DC380F9 /* pdf-manager_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "pdf-manager_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C9665A8C58A08A819DC380F9 /* pinnacle_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "pinnacle_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE52F2CA187A99D1653A5A18 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
 		D9573AE803E5C71390056E26 /* splitter.rs */ = {isa = PBXFileReference; path = splitter.rs; sourceTree = "<group>"; };
 		DD2BAD8FBFEF4B270D1E6891 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
@@ -82,13 +82,13 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		262A92181AD37D0344968761 /* pdf-manager_iOS */ = {
+		262A92181AD37D0344968761 /* pinnacle_iOS */ = {
 			isa = PBXGroup;
 			children = (
 				688E6E95F31580243E43DA99 /* Info.plist */,
-				410B18FC1F40CD1DAE8AA2C2 /* pdf-manager_iOS.entitlements */,
+				410B18FC1F40CD1DAE8AA2C2 /* pinnacle_iOS.entitlements */,
 			);
-			path = "pdf-manager_iOS";
+			path = "pinnacle_iOS";
 			sourceTree = "<group>";
 		};
 		30F2C3DEB4B7EFE5438BBEDF = {
@@ -98,7 +98,7 @@
 				287F87B55C6B1549A82BCDCA /* Assets.xcassets */,
 				5706AEDE63D9BE60FBB718DE /* LaunchScreen.storyboard */,
 				9F848BFB2DB5CF816CBC444D /* Externals */,
-				262A92181AD37D0344968761 /* pdf-manager_iOS */,
+				262A92181AD37D0344968761 /* pinnacle_iOS */,
 				A17E07897AABE457C58B7D46 /* Sources */,
 				7A1325CE90246D43C582BB19 /* src */,
 				10A07C23B0113A9C9A7C8F94 /* Frameworks */,
@@ -106,19 +106,19 @@
 			);
 			sourceTree = "<group>";
 		};
-		32F1E3E27CB516584E7C6930 /* pdf-manager */ = {
+		32F1E3E27CB516584E7C6930 /* pinnacle */ = {
 			isa = PBXGroup;
 			children = (
 				1731501581FF45C93D8C21E0 /* main.mm */,
 				CA248D61ADA61F774CCDA473 /* bindings */,
 			);
-			path = "pdf-manager";
+			path = "pinnacle";
 			sourceTree = "<group>";
 		};
 		4800EBC7D57EEFD56904AC3D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C9665A8C58A08A819DC380F9 /* pdf-manager_iOS.app */,
+				C9665A8C58A08A819DC380F9 /* pinnacle_iOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -145,7 +145,7 @@
 		A17E07897AABE457C58B7D46 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				32F1E3E27CB516584E7C6930 /* pdf-manager */,
+				32F1E3E27CB516584E7C6930 /* pinnacle */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -173,9 +173,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		9A1A8C63539B00B0B6B3C5CE /* pdf-manager_iOS */ = {
+		9A1A8C63539B00B0B6B3C5CE /* pinnacle_iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FF5497BCF6838EDD7621D13B /* Build configuration list for PBXNativeTarget "pdf-manager_iOS" */;
+			buildConfigurationList = FF5497BCF6838EDD7621D13B /* Build configuration list for PBXNativeTarget "pinnacle_iOS" */;
 			buildPhases = (
 				667100FB226EE683D29C2052 /* Build Rust Code */,
 				B8B598CE6C606CEAF31FD71B /* Sources */,
@@ -186,9 +186,9 @@
 			);
 			dependencies = (
 			);
-			name = "pdf-manager_iOS";
-			productName = "pdf-manager_iOS";
-			productReference = C9665A8C58A08A819DC380F9 /* pdf-manager_iOS.app */;
+			name = "pinnacle_iOS";
+			productName = "pinnacle_iOS";
+			productReference = C9665A8C58A08A819DC380F9 /* pinnacle_iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -202,7 +202,7 @@
 				TargetAttributes = {
 				};
 			};
-			buildConfigurationList = 418BFF25F8AF28985C21F287 /* Build configuration list for PBXProject "pdf-manager" */;
+			buildConfigurationList = 418BFF25F8AF28985C21F287 /* Build configuration list for PBXProject "pinnacle" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -214,7 +214,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				9A1A8C63539B00B0B6B3C5CE /* pdf-manager_iOS */,
+				9A1A8C63539B00B0B6B3C5CE /* pinnacle_iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -278,7 +278,7 @@
 					"arm64-sim",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "pdf-manager_iOS/pdf-manager_iOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "pinnacle_iOS/pinnacle_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = "arm64-sim x86_64";
@@ -287,7 +287,7 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = "pdf-manager_iOS/Info.plist";
+				INFOPLIST_FILE = "pinnacle_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -295,8 +295,8 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourdomain.pdfmanager;
-				PRODUCT_NAME = "pdf-manager";
+				PRODUCT_BUNDLE_IDENTIFIER = com.pinnacle.app;
+				PRODUCT_NAME = "pinnacle";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = "arm64  arm64-sim";
@@ -368,7 +368,7 @@
 					"arm64-sim",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "pdf-manager_iOS/pdf-manager_iOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "pinnacle_iOS/pinnacle_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = "arm64-sim x86_64";
@@ -377,7 +377,7 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = "pdf-manager_iOS/Info.plist";
+				INFOPLIST_FILE = "pinnacle_iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -385,8 +385,8 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourdomain.pdfmanager;
-				PRODUCT_NAME = "pdf-manager";
+				PRODUCT_BUNDLE_IDENTIFIER = com.pinnacle.app;
+				PRODUCT_NAME = "pinnacle";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = "arm64  arm64-sim";
@@ -459,7 +459,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		418BFF25F8AF28985C21F287 /* Build configuration list for PBXProject "pdf-manager" */ = {
+		418BFF25F8AF28985C21F287 /* Build configuration list for PBXProject "pinnacle" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E7ACA3DCDCCC2A1B7F4409CE /* debug */,
@@ -468,7 +468,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
-		FF5497BCF6838EDD7621D13B /* Build configuration list for PBXNativeTarget "pdf-manager_iOS" */ = {
+		FF5497BCF6838EDD7621D13B /* Build configuration list for PBXNativeTarget "pinnacle_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BED51B1AB7EA212F57B3DF04 /* debug */,

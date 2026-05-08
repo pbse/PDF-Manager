@@ -1,17 +1,17 @@
 [package]
-name = "pdf-manager"
+name = "pinnacle"
 version = "1.0.0"
-description = "Efficient cross-platform PDF manager built with Rust and Tauri."
+description = "Efficient cross-platform document intelligence platform built with Rust and Tauri."
 authors = ["Prashant Bansal"]
 edition = "2021"
 
 [lib]
-name = "pdf_manager"
+name = "pinnacle"
 path = "src/lib.rs"
 crate-type = ["lib", "staticlib", "cdylib"]
 
 [[bin]]
-name = "pdf-manager"
+name = "pinnacle"
 path = "src/main.rs"
 
 [dependencies]

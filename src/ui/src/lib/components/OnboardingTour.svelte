@@ -8,7 +8,7 @@
 
   const steps = [
     { 
-      title: "Welcome to PDF Manager", 
+      title: "Welcome to Pinnacle", 
       desc: "Your private, world-class intelligent document assistant. 100% on-device processing.",
       icon: "👋"
     },
