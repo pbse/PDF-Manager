@@ -1,23 +1,162 @@
 import { invoke } from "@tauri-apps/api/core";
 import { appState } from "./appState.svelte";
 import { historyState } from "./historyState.svelte";
-import { db, type BookmarkRecord, type VersionRecord, type NoteRecord } from "./db";
+import { db, type BookmarkRecord, type VersionRecord, type NoteRecord, type DocumentRecord } from "./db";
 
-export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek";
+export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings";
 export type SelectionTarget = "parse" | "split" | "rotate" | "delete" | "annotate" | "signature" | "security" | "extract" | "crypto";
 
-export class PdfState {
-  activeTool = $state<ToolId>("merge");
-  highlightedSnippet = $state<string | null>(null);
-  
-  // Bookmarks, Versions & Notes
-  bookmarks = $state<BookmarkRecord[]>([]);
-  versions = $state<VersionRecord[]>([]);
-  notes = $state<NoteRecord[]>([]);
+const state = $state({
+  activeTool: "merge" as ToolId,
+  highlightedSnippet: null as string | null,
+  bookmarks: [] as BookmarkRecord[],
+  versions: [] as VersionRecord[],
+  notes: [] as NoteRecord[],
+  openTabs: [] as string[],
+  selectedParseFile: null as string | null,
+  selectedSplitFile: null as string | null,
+  selectedRotateFile: null as string | null,
+  selectedDeleteFile: null as string | null,
+  selectedAnnotateFile: null as string | null,
+  selectedSignatureFile: null as string | null,
+  selectedCryptoFile: null as string | null,
+  selectedExtractFile: null as string | null,
+  selectedMergeFiles: [] as string[],
+  viewerFilePath: "",
+  viewerPageNumber: 1,
+  viewerMode: "view" as "rect" | "points" | "view",
+  viewerTarget: null as SelectionTarget | null,
+  ocrTrigger: 0,
+  splitPagesInput: "",
+  rotatePagesInput: "",
+  deletePagesInput: "",
+  annotationRectInput: "",
+  annotationType: "highlight" as "highlight" | "underline" | "strikeout" | "note",
+  annotationText: "",
+  annotationColor: "#facc15",
+  signatureRectInput: "",
+  signatureColor: "#0f172a",
+  signatureWidth: 2 as number | null,
+  signatureStrokes: [] as [number, number][][],
+  signCertPath: "",
+  signCertPassword: "",
+  rememberPassword: false,
+  signRectInput: "",
+  signReason: "",
+  signLocation: "",
+  signContact: "",
+  history: [] as any[],
+  redoStack: [] as any[],
+  comparisonFile2: null as string | null,
+
+  switchTool(id: ToolId) {
+    if (id === state.activeTool) return;
+    state.activeTool = id;
+    
+    if (state.viewerFilePath) {
+      if (id === 'split') state.selectedSplitFile = state.viewerFilePath;
+      if (id === 'annotate') {
+        state.selectedAnnotateFile = state.viewerFilePath;
+        state.viewerMode = 'rect';
+        state.viewerTarget = 'annotate';
+      }
+      if (id === 'signature') {
+        state.selectedSignatureFile = state.viewerFilePath;
+        state.viewerMode = 'points';
+        state.viewerTarget = 'signature';
+      }
+      if (id === 'security') {
+        state.selectedCryptoFile = state.viewerFilePath;
+        state.viewerMode = 'rect';
+        state.viewerTarget = 'security';
+      }
+      if (id === 'extract') state.selectedExtractFile = state.viewerFilePath;
+      if (id === 'organize') {
+        state.selectedRotateFile = state.viewerFilePath;
+        state.selectedDeleteFile = state.viewerFilePath;
+      }
+    } else {
+      if (id === 'split' && state.selectedSplitFile) state.viewerFilePath = state.selectedSplitFile;
+      if (id === 'annotate' && state.selectedAnnotateFile) {
+        state.viewerFilePath = state.selectedAnnotateFile;
+        state.viewerMode = 'rect';
+        state.viewerTarget = 'annotate';
+      }
+      if (id === 'signature' && state.selectedSignatureFile) {
+        state.viewerFilePath = state.selectedSignatureFile;
+        state.viewerMode = 'points';
+        state.viewerTarget = 'signature';
+      }
+      if (id === 'security' && state.selectedCryptoFile) {
+        state.viewerFilePath = state.selectedCryptoFile;
+        state.viewerMode = 'rect';
+        state.viewerTarget = 'security';
+      }
+      if (id === 'extract' && state.selectedExtractFile) state.viewerFilePath = state.selectedExtractFile;
+      if (id === 'organize' && state.selectedRotateFile) state.viewerFilePath = state.selectedRotateFile;
+    }
+
+    state.signatureStrokes = [];
+    state.annotationRectInput = "";
+    state.signatureRectInput = "";
+    state.signRectInput = "";
+    
+    if (!['annotate', 'signature', 'security'].includes(id)) {
+      state.viewerMode = "view";
+    }
+    
+    appState.showStatus(`Switched to ${id.toUpperCase()}`, false);
+  },
+
+  openTab(path: string) {
+    if (!path) return;
+    if (!state.openTabs.includes(path)) {
+      state.openTabs = [...state.openTabs, path];
+    }
+    state.viewerFilePath = path;
+    historyState.addFile(path);
+  },
+
+  closeTab(path: string) {
+    state.openTabs = state.openTabs.filter(t => t !== path);
+    if (state.viewerFilePath === path) {
+      state.viewerFilePath = state.openTabs[state.openTabs.length - 1] || "";
+    }
+  },
+
+  async saveReadingProgress(path: string, page: number, total: number) {
+    if (!path) return;
+    const item = await db.documents.where('path').equals(path).first();
+    if (item?.id) {
+      await db.documents.update(item.id, { lastPage: page, totalPages: total });
+    }
+  },
+
+  async getReadingProgress(path: string): Promise<number> {
+    if (!path) return 1;
+    const item = await db.documents.where('path').equals(path).first();
+    return item?.lastPage || 1;
+  },
+
+  async addBookmark(path: string, page: number, label: string) {
+    if (!path) return;
+    await db.bookmarks.add({
+      docPath: path,
+      pageNumber: page,
+      label,
+      timestamp: Date.now()
+    });
+    await state.loadBookmarks(path);
+  },
+
+  async deleteBookmark(id: number) {
+    await db.bookmarks.delete(id);
+    if (state.viewerFilePath) await state.loadBookmarks(state.viewerFilePath);
+  },
 
   async loadNotes() {
-    this.notes = await db.notes.orderBy('timestamp').reverse().toArray();
-  }
+    state.notes = await db.notes.orderBy('timestamp').reverse().toArray();
+  },
 
   async addNote(content: string, citation?: { docPath: string, pageNumber: number, text: string }) {
     await db.notes.add({
@@ -26,248 +165,116 @@ export class PdfState {
       tags: [],
       citations: citation ? [citation] : []
     });
-    await this.loadNotes();
+    await state.loadNotes();
     appState.showStatus("Note saved to Research Notepad.", false);
-  }
+  },
 
   async deleteNote(id: number) {
     await db.notes.delete(id);
-    await this.loadNotes();
-  }
+    await state.loadNotes();
+  },
 
-  // Tabs
-  openTabs = $state<string[]>([]);
-  
   async loadBookmarks(path: string) {
-    this.bookmarks = await db.bookmarks.where('docPath').equals(path).sortBy('timestamp');
-  }
+    state.bookmarks = await db.bookmarks.where('docPath').equals(path).sortBy('timestamp');
+  },
 
   async loadVersions(path: string) {
-    this.versions = await db.versions.where('docPath').equals(path).sortBy('timestamp');
-  }
+    state.versions = await db.versions.where('docPath').equals(path).sortBy('timestamp');
+  },
 
   async saveSnapshot(path: string, label: string) {
-    const bytes = await invoke<number[]>("read_file_bytes", { path });
+    const bytes = await invoke<Uint8Array>("read_file_bytes", { path });
     await db.versions.add({
       docPath: path,
       label,
       timestamp: Date.now(),
-      data: new Uint8Array(bytes)
+      data: bytes
     });
-    await this.loadVersions(path);
-  }
+    await state.loadVersions(path);
+  },
 
   async restoreSnapshot(version: VersionRecord, outputPath: string) {
-    await invoke("write_file_bytes", { path: outputPath, bytes: Array.from(version.data) });
+    await invoke("write_file_bytes", { path: outputPath, bytes: version.data });
     appState.showStatus(`Restored to: ${version.label}`, false, outputPath);
-  }
+  },
 
-  // Workspace Sessions
   async saveSession(name: string) {
     const session = {
       name,
-      tabs: this.openTabs,
-      activeTab: this.viewerFilePath,
+      tabs: state.openTabs,
+      activeTab: state.viewerFilePath,
       timestamp: Date.now()
     };
     localStorage.setItem(`pdf_session_${name}`, JSON.stringify(session));
     appState.showStatus(`Session "${name}" saved.`, false);
-  }
+  },
 
   async loadSession(name: string) {
     const saved = localStorage.getItem(`pdf_session_${name}`);
     if (saved) {
       const session = JSON.parse(saved);
-      this.openTabs = session.tabs;
-      this.viewerFilePath = session.activeTab;
+      state.openTabs = session.tabs;
+      state.viewerFilePath = session.activeTab;
       appState.showStatus(`Restored session: ${name}`, false);
     }
-  }
-
-  openTab(path: string) {
-    if (!this.openTabs.includes(path)) {
-      this.openTabs = [...this.openTabs, path];
-    }
-    this.viewerFilePath = path;
-    historyState.addFile(path);
-  }
-
-  closeTab(path: string) {
-    this.openTabs = this.openTabs.filter(t => t !== path);
-    if (this.viewerFilePath === path) {
-      this.viewerFilePath = this.openTabs[this.openTabs.length - 1] || "";
-    }
-  }
-
-  async saveReadingProgress(path: string, page: number, total: number) {
-    const item = await db.documents.where('path').equals(path).first();
-    if (item?.id) {
-      await db.documents.update(item.id, { lastPage: page, totalPages: total });
-    }
-  }
-
-  async getReadingProgress(path: string): Promise<number> {
-    const item = await db.documents.where('path').equals(path).first();
-    return item?.lastPage || 1;
-  }
-
-  async addBookmark(path: string, page: number, label: string) {
-    await db.bookmarks.add({
-      docPath: path,
-      pageNumber: page,
-      label,
-      timestamp: Date.now()
-    });
-    await this.loadBookmarks(path);
-  }
-
-  async deleteBookmark(id: number) {
-    await db.bookmarks.delete(id);
-    if (this.viewerFilePath) await this.loadBookmarks(this.viewerFilePath);
-  }
+  },
   
-  // File Selections
-  selectedParseFile = $state<string | null>(null);
-  selectedSplitFile = $state<string | null>(null);
-  selectedRotateFile = $state<string | null>(null);
-  selectedDeleteFile = $state<string | null>(null);
-  selectedAnnotateFile = $state<string | null>(null);
-  selectedSignatureFile = $state<string | null>(null);
-  selectedCryptoFile = $state<string | null>(null);
-  selectedExtractFile = $state<string | null>(null);
-  selectedMergeFiles = $state<string[]>([]);
-
-  // Viewer State
-  viewerFilePath = $state("");
-  viewerPageNumber = $state(1);
-  viewerMode = $state<"rect" | "points" | "view">("view");
-  viewerTarget = $state<SelectionTarget | null>(null);
-  ocrTrigger = $state(0);
-
-  // Tools specific inputs
-  splitPagesInput = $state("");
-  rotatePagesInput = $state("");
-  deletePagesInput = $state("");
-  annotationRectInput = $state("");
-  annotationType = $state<"highlight" | "underline" | "strikeout" | "note">("highlight");
-  annotationText = $state("");
-  annotationColor = $state("#facc15");
-  signatureRectInput = $state("");
-  signatureColor = $state("#0f172a");
-  signatureWidth = $state<number | null>(2);
-  signatureStrokes = $state<[number, number][][]>([]);
-  signCertPath = $state("");
-  signCertPassword = $state("");
-  rememberPassword = $state(false);
-  signRectInput = $state("");
-  signReason = $state("");
-  signLocation = $state("");
-  signContact = $state("");
-
-  // History / Undo Stack
-  history = $state<any[]>([]);
-  redoStack = $state<any[]>([]);
-
-  pushHistory(state: any) {
-    this.history.push(JSON.parse(JSON.stringify(state)));
-    this.redoStack = []; // Clear redo on new action
-  }
+  pushHistory(hState: any) {
+    state.history.push(JSON.parse(JSON.stringify(hState)));
+    state.redoStack = []; 
+  },
 
   undo() {
-    if (this.history.length > 0) {
-      const lastState = this.history.pop();
-      this.redoStack.push(JSON.parse(JSON.stringify(this.getCurrentUndoState())));
-      this.applyUndoState(lastState);
+    if (state.history.length > 0) {
+      const lastState = state.history.pop();
+      state.redoStack.push(JSON.parse(JSON.stringify({
+        signatureStrokes: state.signatureStrokes,
+        annotationRectInput: state.annotationRectInput,
+        signatureRectInput: state.signatureRectInput
+      })));
+      state.signatureStrokes = lastState.signatureStrokes;
+      state.annotationRectInput = lastState.annotationRectInput;
+      state.signatureRectInput = lastState.signatureRectInput;
     }
-  }
+  },
 
   redo() {
-    if (this.redoStack.length > 0) {
-      const nextState = this.redoStack.pop();
-      this.history.push(JSON.parse(JSON.stringify(this.getCurrentUndoState())));
-      this.applyUndoState(nextState);
+    if (state.redoStack.length > 0) {
+      const nextState = state.redoStack.pop();
+      state.history.push(JSON.parse(JSON.stringify({
+        signatureStrokes: state.signatureStrokes,
+        annotationRectInput: state.annotationRectInput,
+        signatureRectInput: state.signatureRectInput
+      })));
+      state.signatureStrokes = nextState.signatureStrokes;
+      state.annotationRectInput = nextState.annotationRectInput;
+      state.signatureRectInput = nextState.signatureRectInput;
     }
-  }
+  },
 
-  private getCurrentUndoState() {
-    return {
-      signatureStrokes: this.signatureStrokes,
-      annotationRectInput: this.annotationRectInput,
-      signatureRectInput: this.signatureRectInput
-    };
-  }
-
-  private applyUndoState(state: any) {
-    this.signatureStrokes = state.signatureStrokes;
-    this.annotationRectInput = state.annotationRectInput;
-    this.signatureRectInput = state.signatureRectInput;
-  }
-
-  switchTool(id: ToolId) {
-    if (id === this.activeTool) return;
-    this.activeTool = id;
+  setFileForTarget(target: SelectionTarget, path: string) {
+    if (!path) return;
     
-    // Auto-target current file if viewing one
-    if (this.viewerFilePath) {
-      if (id === 'split') this.selectedSplitFile = this.viewerFilePath;
-      if (id === 'annotate') {
-        this.selectedAnnotateFile = this.viewerFilePath;
-        this.viewerMode = 'rect';
-        this.viewerTarget = 'annotate';
-      }
-      if (id === 'signature') {
-        this.selectedSignatureFile = this.viewerFilePath;
-        this.viewerMode = 'points';
-        this.viewerTarget = 'signature';
-      }
-      if (id === 'security') {
-        this.selectedCryptoFile = this.viewerFilePath;
-        this.viewerMode = 'rect';
-        this.viewerTarget = 'security';
-      }
-      if (id === 'extract') this.selectedExtractFile = this.viewerFilePath;
-      if (id === 'organize') {
-        this.selectedRotateFile = this.viewerFilePath;
-        this.selectedDeleteFile = this.viewerFilePath;
-      }
+    switch (target) {
+      case "split": state.selectedSplitFile = path; break;
+      case "rotate": state.selectedRotateFile = path; break;
+      case "delete": state.selectedDeleteFile = path; break;
+      case "annotate": state.selectedAnnotateFile = path; break;
+      case "signature": state.selectedSignatureFile = path; break;
+      case "security": 
+      case "crypto": state.selectedCryptoFile = path; break;
+      case "extract": state.selectedExtractFile = path; break;
     }
 
-    // Reset interaction states
-    this.signatureStrokes = [];
-    this.annotationRectInput = "";
-    this.signatureRectInput = "";
-    this.signRectInput = "";
-    
-    // Only reset mode if not already set by tool logic above
-    if (!['annotate', 'signature', 'security'].includes(id)) {
-      this.viewerMode = "view";
-    }
-    
-    appState.showStatus(`Switched to ${id.toUpperCase()}`, false);
-  }
+    state.openTab(path);
+  },
 
   async selectFile(target: SelectionTarget) {
     const result = await invoke<string[]>("open_file_dialog", { multiple: false });
     if (result && result.length > 0) {
-      const path = result[0];
-      this.setFileForTarget(target, path);
-      this.openTab(path);
+      state.setFileForTarget(target, result[0]);
     }
-  }
-
-  setFileForTarget(target: SelectionTarget, path: string) {
-    historyState.addFile(path);
-    switch (target) {
-      case "split": this.selectedSplitFile = path; break;
-      case "rotate": this.selectedRotateFile = path; break;
-      case "delete": this.selectedDeleteFile = path; break;
-      case "annotate": this.selectedAnnotateFile = path; break;
-      case "signature": this.selectedSignatureFile = path; break;
-      case "security": this.selectedCryptoFile = path; break;
-      case "extract": this.selectedExtractFile = path; break;
-      case "crypto": this.selectedCryptoFile = path; break;
-    }
-  }
+  },
 
   handleDroppedFiles(paths: string[]) {
     const pdfs = paths.filter((p) => p.toLowerCase().endsWith(".pdf"));
@@ -277,21 +284,18 @@ export class PdfState {
     }
     if (pdfs.length > 1) {
       pdfs.forEach(p => historyState.addFile(p));
-      this.selectedMergeFiles = [...new Set([...this.selectedMergeFiles, ...pdfs])];
+      state.selectedMergeFiles = [...new Set([...state.selectedMergeFiles, ...pdfs])];
       appState.showStatus(`Added ${pdfs.length} PDFs to Merge.`, false);
     } else {
       const path = pdfs[0];
-      this.setFileForTarget("split", path);
-      this.setFileForTarget("rotate", path);
-      this.setFileForTarget("delete", path);
-      this.setFileForTarget("annotate", path);
-      this.setFileForTarget("signature", path);
-      this.setFileForTarget("security", path);
-      this.setFileForTarget("extract", path);
-      this.viewerFilePath = path;
+      state.setFileForTarget('split', path);
       appState.showStatus(`Selected: ${path.split(/[/\\]/).pop()}`, false);
     }
   }
-}
+});
 
-export const pdfState = new PdfState();
+export const pdfState = state;
+
+if (typeof window !== "undefined") {
+  (window as any).__PINNACLE_PDF_STATE__ = pdfState;
+}

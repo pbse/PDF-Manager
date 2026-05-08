@@ -26,8 +26,7 @@
       const foundStrings = (parsed.pii || []).map((item: any) => item.value);
       
       if (foundStrings.length > 0) {
-        const bytes = await invoke<number[]>("read_file_bytes", { path: pdfState.selectedCryptoFile });
-        const uint8 = new Uint8Array(bytes);
+        const uint8 = await invoke<Uint8Array>("read_file_bytes", { path: pdfState.selectedCryptoFile });
         // @ts-ignore
         const pdfjs = await import("pdfjs-dist");
         const pdf = await pdfjs.getDocument({ data: uint8 }).promise;
@@ -351,8 +350,12 @@
         </div>
 
 
-        <button onclick={handleCryptoSign} disabled={!pdfState.selectedCryptoFile || !pdfState.signCertPath || !pdfState.signCertPassword} class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-xl transition-all hover:scale-[1.02]">
-          {!pdfState.selectedCryptoFile ? 'Select PDF' : !pdfState.signCertPath ? 'Select Cert' : !pdfState.signCertPassword ? 'Enter Pwd' : 'Sign Permanently'}
+        <button 
+          onclick={() => !pdfState.signRectInput ? openViewer('rect') : handleCryptoSign()} 
+          disabled={!pdfState.selectedCryptoFile || !pdfState.signCertPath || !pdfState.signCertPassword} 
+          class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-xl transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {!pdfState.selectedCryptoFile ? 'Select PDF' : !pdfState.signCertPath ? 'Select Cert' : !pdfState.signCertPassword ? 'Enter Pwd' : !pdfState.signRectInput ? 'Enter Selection Mode' : 'Sign Permanently'}
         </button>
       </div>
     </div>

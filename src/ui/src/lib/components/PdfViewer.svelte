@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { browser } from "$app/environment";
   import Tesseract from "tesseract.js";
+  import { pdfState } from "$lib/state/pdfState.svelte";
 
   let {
     filePath = "",
@@ -12,12 +13,15 @@
     previewStrokes = [],
     previewColor = "red",
     ocrTrigger = 0,
+    entityMappingTrigger = { dates: [], amounts: [], orgs: [] },
+    highlightedSnippet = null,
     onselect,
     onclear,
     onclose,
     ondone,
     onprev,
-    onnext
+    onnext,
+    onreorder
   } = $props<{
     filePath?: string;
     pageNumber?: number;
@@ -167,16 +171,21 @@
     if (pdfDoc) { try { await pdfDoc.destroy(); } catch (e) {} pdfDoc = null; }
     loading = true; error = "";
     try {
-      const bytes = await invoke<number[]>("read_file_bytes", { path: filePath });
-      const uint8Array = new Uint8Array(bytes);
+      // Use Uint8Array directly to avoid expensive number array conversion
+      const uint8Array = await invoke<Uint8Array>("read_file_bytes", { path: filePath });
       const loadingTask = pdfjs.getDocument({ data: uint8Array });
       pdfDoc = await loadingTask.promise;
       lastLoadedPath = filePath; lastRenderedPage = -1;
-      await generateThumbnails();
-      try { outline = await invoke("get_pdf_outline", { path: filePath }); } catch (e) { outline = []; }
-      try { annotations = await invoke("get_annotations", { path: filePath }); } catch (e) { annotations = []; }
-      try { await pdfState.loadBookmarks(filePath); } catch (e) {}
-      pageNumber = await pdfState.getReadingProgress(filePath);
+      
+      // Parallelize non-critical tasks
+      Promise.all([
+        generateThumbnails(),
+        invoke("get_pdf_outline", { path: filePath }).then(o => outline = o).catch(() => outline = []),
+        invoke("get_annotations", { path: filePath }).then(a => annotations = a).catch(() => annotations = []),
+        pdfState.loadBookmarks(filePath).catch(() => {}),
+        pdfState.getReadingProgress(filePath).then(p => { pageNumber = p; })
+      ]);
+
       await renderPage();
     } catch (err: any) { error = "Load failed: " + err.toString(); } finally { loading = false; }
   }
@@ -187,17 +196,25 @@
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
     
-    // Only generate first 50 thumbnails for performance, or all if small
+    // Only generate first few thumbnails immediately, then the rest in background
     const limit = Math.min(pdfDoc.numPages, 100);
     for (let i = 1; i <= limit; i++) {
-      const page = await pdfDoc.getPage(i);
-      const vp = page.getViewport({ scale: 0.2 });
-      canvas.width = vp.width;
-      canvas.height = vp.height;
-      await page.render({ canvasContext: ctx, viewport: vp }).promise;
-      thumbs.push({ pageNumber: i, dataUrl: canvas.toDataURL() });
+      try {
+        const page = await pdfDoc.getPage(i);
+        const vp = page.getViewport({ scale: 0.2 });
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        thumbs.push({ pageNumber: i, dataUrl: canvas.toDataURL() });
+        
+        // Update incrementally for better perceived performance
+        if (i % 5 === 0 || i === limit) {
+          thumbnails = [...thumbs];
+        }
+      } catch (e) {
+        console.error(`Failed to generate thumbnail for page ${i}`, e);
+      }
     }
-    thumbnails = thumbs;
   }
 
   async function renderPage() {
@@ -294,8 +311,8 @@
       const width = Math.abs(currentRect.x2 - currentRect.x1);
       const height = Math.abs(currentRect.y2 - currentRect.y1);
       
-      // Region Zoom
-      if (width > 20 && height > 20 && sidebarTab === 'thumbs') {
+      // Region Zoom - Only if no specific target is active (e.g. annotate, sign)
+      if (width > 20 && height > 20 && !pdfState.viewerTarget && sidebarTab === 'thumbs') {
          const zoomFactor = Math.min(canvas!.width / width, canvas!.height / height);
          scale = Math.min(scale * zoomFactor, 10.0);
          renderPage();
@@ -358,7 +375,7 @@
   }
 
   async function mapEntitiesToCanvas(entities: { dates: string[], amounts: string[], orgs: string[] }) {
-    if (!pdfDoc) return;
+    if (!pdfDoc || !entities) return;
     const highlights: typeof entityHighlights = [];
     
     for (let i = 1; i <= pdfDoc.numPages; i++) {
@@ -366,10 +383,11 @@
       const textContent = await page.getTextContent();
       
       const process = (list: string[], label: string, color: string) => {
+        if (!Array.isArray(list)) return;
         for (const val of list) {
-          if (!val) continue;
+          if (!val || typeof val !== "string") continue;
           for (const item of textContent.items as any[]) {
-            if (item.str.toLowerCase().includes(val.toLowerCase())) {
+            if (item.str && item.str.toLowerCase().includes(val.toLowerCase())) {
               const [sx, sy, skx, sky, tx, ty] = item.transform;
               highlights.push({ page: i, label, color, rects: [[tx, ty, tx + item.width, ty + item.height]] });
             }
@@ -737,13 +755,13 @@
           onmousemove={handleMouseMove} 
           onmouseup={handleMouseUp} 
           onmouseleave={handleMouseUp} 
-          class="bg-white ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm cursor-crosshair max-w-full transition-all duration-300 {isInverted ? 'invert hue-rotate-180 brightness-90 contrast-110' : ''}"
+          class="bg-white ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm cursor-crosshair transition-all duration-300 {isInverted ? 'invert hue-rotate-180 brightness-90 contrast-110' : ''}"
         ></canvas>
 
         <!-- Native Text Selection Layer -->
         {#if viewport && textItems.length > 0}
           <div 
-            class="absolute top-0 left-0 right-0 bottom-0 pointer-events-auto select-text text-transparent overflow-hidden"
+            class="absolute top-0 left-0 right-0 bottom-0 {mode === 'view' ? 'pointer-events-auto' : 'pointer-events-none'} select-text text-transparent overflow-hidden"
             bind:this={textLayer}
             onmouseup={handleTextSelection}
             role="none"
@@ -822,6 +840,7 @@
            {@const [vx1, vy1] = viewport.convertToViewportPoint(annot.rect[0], annot.rect[1])}
            {@const [vx2, vy2] = viewport.convertToViewportPoint(annot.rect[2], annot.rect[3])}
            <!-- svelte-ignore a11y_no_static_element_interactions -->
+           <!-- svelte-ignore a11y_click_events_have_key_events -->
            <rect 
              x={Math.min(vx1, vx2)} 
              y={Math.min(vy1, vy2)} 

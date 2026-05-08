@@ -20,6 +20,8 @@
     return [((intVal >> 16) & 255) / 255, ((intVal >> 8) & 255) / 255, (intVal & 255) / 255];
   }
 
+  let makePermanent = $state(true); // Default to true for signatures for better security
+
   async function handleSignatureVisual() {
     if (!pdfState.selectedSignatureFile) { appState.showStatus("Please select a PDF to sign.", true); return; }
     const rectArray = parseRect(pdfState.signatureRectInput);
@@ -32,7 +34,13 @@
     appState.startLoading("Applying signature...");
     try {
       await invoke("add_signature_visual", { path: pdfState.selectedSignatureFile, page: pdfState.viewerPageNumber, rect: rectArray, strokes: pdfState.signatureStrokes, color: colorArray, width: pdfState.signatureWidth ?? 2, outputPath });
-      appState.showStatus(`Signature applied successfully.`, false, outputPath);
+      
+      if (makePermanent) {
+        appState.startLoading("Burning signature into content...");
+        await invoke("flatten_annotations", { path: outputPath, outputPath: outputPath });
+      }
+
+      appState.showStatus(`Signature applied successfully ${makePermanent ? '(Permanent)' : ''}.`, false, outputPath);
       await invoke("shell_open", { filePath: outputPath });
     } catch (err) { appState.showStatus(`Error signing: ${err}`, true); }
   }
@@ -119,6 +127,12 @@
           <span class="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 font-bold transition-colors tracking-widest">{pdfState.signatureColor}</span>
         </div>
       </div>
+      
+      <label class="flex items-center gap-2 cursor-pointer pt-2 group">
+        <input type="checkbox" bind:checked={makePermanent} class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all" />
+        <span class="text-[10px] font-bold text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors uppercase tracking-tight">Non-Deletable Signature (Flatten)</span>
+      </label>
+
       <div class="flex gap-2">
         <button onclick={handleSignatureVisual} disabled={!pdfState.selectedSignatureFile || pdfState.signatureStrokes.length === 0} class="flex-[2] py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest transition-all shadow-xl hover:scale-[1.02]">
           {!pdfState.selectedSignatureFile ? 'Select PDF' : pdfState.signatureStrokes.length === 0 ? 'Draw Signature' : 'Apply Signature'}

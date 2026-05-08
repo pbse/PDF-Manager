@@ -219,6 +219,7 @@
         <button onclick={handleDelete} disabled={!pdfState.selectedDeleteFile} class="w-full py-2 border border-red-200 dark:border-red-900 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded font-bold text-[10px] uppercase tracking-widest transition-all">
           {!pdfState.selectedDeleteFile ? 'Select PDF' : 'Remove Pages'}
         </button>
+      </div>
     </div>
   </div>
 </ToolPane>

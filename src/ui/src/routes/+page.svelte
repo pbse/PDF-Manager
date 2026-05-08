@@ -48,6 +48,23 @@
   const intelligenceTools = ['extract', 'compare', 'notepad', 'library', 'versions', 'settings'];
   const operationTools = ['merge', 'split', 'annotate', 'signature', 'security', 'organize', 'forms', 'watermark'];
 
+  const toolPanes: Record<string, any> = {
+    extract: ExtractPane,
+    settings: SettingsPane,
+    compare: ComparePane,
+    library: LibraryPane,
+    versions: VersionsPane,
+    notepad: NotepadPane,
+    merge: MergePane,
+    split: SplitPane,
+    annotate: AnnotatePane,
+    signature: SignaturePane,
+    security: SecurityPane,
+    organize: OrganizePane,
+    forms: FormsPane,
+    watermark: WatermarkPane
+  };
+
   // --- Derived State (Directly from pdfState for maximum reactivity) ---
   let currentPreviewRect = $derived(
     pdfState.activeTool === "annotate"
@@ -72,7 +89,7 @@
   );
 
   function parseRect(rectStr: string): number[] | null {
-    if (!rectStr) return null;
+    if (!rectStr || typeof rectStr !== "string") return null;
     const parts = rectStr.split(",").map((p) => p.trim()).filter((p) => p.length > 0);
     if (parts.length !== 4) return null;
     const nums = parts.map((p) => Number(p));
@@ -124,8 +141,13 @@
         .catch(e => console.error(e));
       chatState.getDocumentInsights(pdfState.viewerFilePath)
         .then(i => {
-          aiInsights = i;
-          historyState.indexEntities(pdfState.viewerFilePath, i);
+          const safeInsights = {
+            dates: Array.isArray(i?.dates) ? i.dates : [],
+            amounts: Array.isArray(i?.amounts) ? i.amounts : [],
+            orgs: Array.isArray(i?.orgs) ? i.orgs : []
+          };
+          aiInsights = safeInsights;
+          historyState.indexEntities(pdfState.viewerFilePath, safeInsights);
         })
         .catch(e => console.error(e));
       chatState.loadHistory(pdfState.viewerFilePath);
@@ -146,7 +168,7 @@
   onMount(() => {
     const handleGlobalKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (operationTools.includes(pdfState.activeTool)) pdfState.activeTool = 'extract';
+        if (operationTools.includes(pdfState.activeTool)) pdfState.activeTool = 'peek';
       }
       
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -184,53 +206,34 @@
   });
 </script>
 
-<div class="flex h-screen overflow-hidden font-sans transition-colors duration-300 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+<div class="flex h-screen w-screen overflow-hidden font-sans transition-colors duration-300 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100">
   {#if !isZenMode}
-    <div class="shrink-0" transition:fly={{ x: -50, duration: 300 }}>
+    <div class="shrink-0 h-full">
       <SidebarNav />
     </div>
 
     <!-- Secondary Sidebar Pane -->
     <div 
-      class="relative overflow-hidden border-r border-slate-200 dark:border-slate-800 transition-all duration-500 shrink-0 {(intelligenceTools.includes(pdfState.activeTool) || operationTools.includes(pdfState.activeTool)) ? 'w-80 opacity-100' : 'w-0 opacity-0 pointer-events-none'}" 
+      class="relative h-full overflow-hidden border-r border-slate-200 dark:border-slate-800 transition-all duration-500 shrink-0 {(intelligenceTools.includes(pdfState.activeTool) || operationTools.includes(pdfState.activeTool)) ? 'w-80 opacity-100' : 'w-0 opacity-0 pointer-events-none'}" 
+      data-testid="sidebar-pane"
     >
-      {#if pdfState.activeTool === 'extract'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><ExtractPane /></div>
-      {:else if pdfState.activeTool === 'settings'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><SettingsPane /></div>
-      {:else if pdfState.activeTool === 'compare'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><ComparePane /></div>
-      {:else if pdfState.activeTool === 'library'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><LibraryPane /></div>
-      {:else if pdfState.activeTool === 'versions'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><VersionsPane /></div>
-      {:else if pdfState.activeTool === 'notepad'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><NotepadPane /></div>
-      {:else if pdfState.activeTool === 'merge'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><MergePane /></div>
-      {:else if pdfState.activeTool === 'split'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><SplitPane /></div>
-      {:else if pdfState.activeTool === 'annotate'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><AnnotatePane /></div>
-      {:else if pdfState.activeTool === 'signature'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><SignaturePane /></div>
-      {:else if pdfState.activeTool === 'security'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><SecurityPane /></div>
-      {:else if pdfState.activeTool === 'organize'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><OrganizePane /></div>
-      {:else if pdfState.activeTool === 'forms'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><FormsPane /></div>
-      {:else if pdfState.activeTool === 'watermark'}
-        <div in:fly={{ x: -20, duration: 300, delay: 100 }} class="absolute inset-0"><WatermarkPane /></div>
-      {/if}
+      {#key pdfState.activeTool}
+        {@const ActivePane = toolPanes[pdfState.activeTool]}
+        {#if ActivePane}
+          <div class="absolute inset-0" data-testid="active-pane-{pdfState.activeTool}">
+            <ActivePane />
+          </div>
+        {/if}
+      {/key}
     </div>
   {/if}
 
   <!-- Main Area -->
-  <main class="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 relative overflow-hidden h-full">
+  <main class="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 relative h-full">
     
     {#if pdfState.viewerFilePath}
-      <div class="flex-1 flex flex-col min-h-0 h-full">
+      <!-- PDF Viewer Layer -->
+      <div class="absolute inset-0 z-10 flex flex-col bg-white dark:bg-slate-950 transition-all duration-300">
         <!-- Tab Bar -->
         <div class="flex items-center px-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar shrink-0">
           {#each pdfState.openTabs as tab}
@@ -259,13 +262,13 @@
                 <p class="text-[9px] text-slate-400 dark:text-slate-500 font-medium truncate italic leading-none mt-0.5 tracking-tight">{aiSummary}</p>
               {/if}
               <div class="flex gap-2 mt-1.5 overflow-hidden">
-                 {#each aiInsights.dates as date}
+                 {#each (aiInsights.dates || []) as date}
                    <span class="px-1.5 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-800 rounded text-[7px] font-black uppercase tracking-tighter shadow-sm">{date}</span>
                  {/each}
-                 {#each aiInsights.amounts as amt}
+                 {#each (aiInsights.amounts || []) as amt}
                    <span class="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800 rounded text-[7px] font-black uppercase tracking-tighter shadow-sm">{amt}</span>
                  {/each}
-                 {#each aiInsights.orgs as org}
+                 {#each (aiInsights.orgs || []) as org}
                    <span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 rounded text-[7px] font-black uppercase tracking-tighter shadow-sm">{org}</span>
                  {/each}
               </div>
@@ -273,6 +276,7 @@
 
           </div>
           <div class="flex items-center gap-4 text-xs font-medium text-slate-500 transition-colors">
+            <button onclick={() => pdfState.viewerFilePath = ""} class="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg transition-all text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">Dashboard</button>
             <span class="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full uppercase tracking-widest text-[9px] font-black transition-colors">Live Preview</span>
             <button onclick={() => pdfState.viewerFilePath = ""} class="hover:text-red-500 transition-colors">✕</button>
           </div>
@@ -362,24 +366,25 @@
               {/if}
             </div>
           {:else}
-            <PdfViewer
-              filePath={pdfState.viewerFilePath}
-              pageNumber={pdfState.viewerPageNumber}
-              mode={pdfState.viewerMode}
-              previewRect={currentPreviewRect}
-              previewStrokes={currentPreviewStrokes}
-              previewColor={currentPreviewColor}
-              ocrTrigger={pdfState.ocrTrigger}
-              entityMappingTrigger={aiInsights}
-              highlightedSnippet={pdfState.highlightedSnippet}
-              onselect={handleViewerSelect}
-              onclear={handleViewerClear}
-              ondone={() => (pdfState.viewerMode = "view")}
-              onprev={() => (pdfState.viewerPageNumber = Math.max(1, pdfState.viewerPageNumber - 1))}
-              onnext={() => pdfState.viewerPageNumber++}
-              onclose={() => (pdfState.viewerFilePath = "")}
-              onreorder={(newOrder) => {
-                if (pdfState.viewerTarget === 'rotate') {
+            <div class="w-full h-full min-h-0 flex justify-center items-start overflow-hidden">
+              <PdfViewer
+                filePath={pdfState.viewerFilePath}
+                pageNumber={pdfState.viewerPageNumber}
+                mode={pdfState.viewerMode}
+                previewRect={currentPreviewRect}
+                previewStrokes={currentPreviewStrokes}
+                previewColor={currentPreviewColor}
+                ocrTrigger={pdfState.ocrTrigger}
+                entityMappingTrigger={aiInsights}
+                highlightedSnippet={pdfState.highlightedSnippet}
+                onselect={handleViewerSelect}
+                onclear={handleViewerClear}
+                ondone={() => (pdfState.viewerMode = "view")}
+                onprev={() => (pdfState.viewerPageNumber = Math.max(1, pdfState.viewerPageNumber - 1))}
+                onnext={() => pdfState.viewerPageNumber++}
+                onclose={() => (pdfState.viewerFilePath = "")}
+                onreorder={(newOrder) => {
+                  if (pdfState.viewerTarget === 'rotate') {
                    invoke("save_file_dialog", { defaultPath: "reordered.pdf" }).then(outputPath => {
                      if (!outputPath) return;
                      appState.startLoading("Reordering pages...");
@@ -388,15 +393,16 @@
                         invoke("shell_open", { filePath: outputPath as string });
                      }).catch(e => appState.showStatus(`Reorder failed: ${e}`, true));
                    });
-                }
-              }}
-            />
+                  }
+                }}
+              />
+            </div>
           {/if}
         </div>
       </div>
     {:else}
-      <!-- Welcome Screen -->
-      <div class="flex-1 flex flex-col items-center justify-center p-12 bg-slate-50 dark:bg-slate-950 overflow-y-auto no-scrollbar h-full">
+      <!-- Welcome Screen Layer -->
+      <div class="absolute inset-0 z-0 flex flex-col items-center justify-center p-12 bg-slate-50 dark:bg-slate-950 overflow-y-auto no-scrollbar h-full">
         <div class="max-w-4xl w-full">
           <div class="text-center mb-16">
              <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-8 text-4xl shadow-2xl shadow-blue-500/20 text-white animate-pulse">📄</div>

@@ -1,38 +1,40 @@
-import { tick } from "svelte";
-
-export class AppState {
-  isLoading = $state(false);
-  statusMessage = $state("");
-  isError = $state(false);
-  lastSuccessPath = $state<string | null>(null);
-  accentColor = $state("#3b82f6"); // Default blue-500
+const state = $state({
+  isLoading: false,
+  statusMessage: "",
+  isError: false,
+  lastSuccessPath: null as string | null,
+  accentColor: "#3b82f6",
   
-  private statusTimeout: any = null;
+  statusTimeout: null as any,
 
   showStatus(message: string, error: boolean = false, path: string | null = null, duration: number = 6000) {
-    if (this.statusTimeout) clearTimeout(this.statusTimeout);
+    if (state.statusTimeout) clearTimeout(state.statusTimeout);
     
-    this.statusMessage = message;
-    this.isError = error;
-    this.isLoading = false;
-    this.lastSuccessPath = path;
+    state.statusMessage = message;
+    state.isError = error;
+    state.isLoading = false;
+    state.lastSuccessPath = path;
 
     if (duration > 0) {
-      this.statusTimeout = setTimeout(() => {
-        this.statusMessage = "";
-        this.isError = false;
-        this.lastSuccessPath = null;
+      state.statusTimeout = setTimeout(() => {
+        state.statusMessage = "";
+        state.isError = false;
+        state.lastSuccessPath = null;
       }, duration);
     }
-  }
+  },
 
   startLoading(message: string = "Processing...") {
-    if (this.statusTimeout) clearTimeout(this.statusTimeout);
-    this.isLoading = true;
-    this.statusMessage = message;
-    this.isError = false;
-    this.lastSuccessPath = null;
+    if (state.statusTimeout) clearTimeout(state.statusTimeout);
+    state.isLoading = true;
+    state.statusMessage = message;
+    state.isError = false;
+    state.lastSuccessPath = null;
   }
-}
+});
 
-export const appState = new AppState();
+export const appState = state;
+
+if (typeof window !== "undefined") {
+  (window as any).__PINNACLE_APP_STATE__ = appState;
+}

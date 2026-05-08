@@ -80,6 +80,7 @@ export class HistoryState {
 
   async indexEntities(path: string, insights: { dates: string[], amounts: string[], orgs: string[] }) {
     const processList = async (list: string[], type: 'org' | 'person' | 'date' | 'location') => {
+      if (!Array.isArray(list)) return;
       for (const name of list) {
         if (!name) continue;
         const existing = await db.entities.where('name').equals(name).first();
@@ -93,8 +94,8 @@ export class HistoryState {
       }
     };
 
-    await processList(insights.orgs, 'org');
-    await processList(insights.dates, 'date');
+    await processList(insights?.orgs || [], 'org');
+    await processList(insights?.dates || [], 'date');
     // person and location could be added to insights extraction in a future refinement
   }
 

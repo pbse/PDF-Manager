@@ -141,16 +141,55 @@ pub fn add_annotation(
             }
             d
         }
-        "note" | "text" => {
+        "note" | "text" | "freetext" => {
             let mut d = dictionary! {
                 "Type" => "Annot",
-                "Subtype" => "Text",
+                "Subtype" => "FreeText",
                 "Rect" => rect_obj.clone(),
                 "C" => color_array(color),
                 "F" => 4_i64,
+                "DA" => Object::string_literal("0 0 0 rg /Helv 12 Tf"),
             };
-            if let Some(text) = contents {
-                d.set("Contents", Object::string_literal(text));
+            if let Some(text) = contents.clone() {
+                d.set("Contents", Object::string_literal(text.clone()));
+                
+                // Generate Appearance Stream
+                let w = rect[2] - rect[0];
+                let h = rect[3] - rect[1];
+                
+                let mut ap_content = String::new();
+                ap_content.push_str("q\n");
+                ap_content.push_str("0 0 0 rg\n"); // Black text
+                ap_content.push_str("BT\n/Helv 10 Tf\n"); // Font Helvetica 10pt
+                
+                // Basic text wrapping / positioning
+                let mut current_y = h - 12.0;
+                for line in text.lines() {
+                    if current_y < 0.0 { break; }
+                    ap_content.push_str(&format!("2 {} Td\n", current_y));
+                    ap_content.push_str(&format!("({}) Tj\n", line.replace("(", "\\(").replace(")", "\\)")));
+                    ap_content.push_str(&format!("-2 -{} Td\n", current_y)); // Reset X
+                    current_y -= 12.0;
+                }
+                ap_content.push_str("ET\nQ\n");
+
+                let ap_dict = dictionary! {
+                    "Type" => "XObject",
+                    "Subtype" => "Form",
+                    "BBox" => Object::Array(vec![0.into(), 0.into(), w.into(), h.into()]),
+                    "Resources" => dictionary! {
+                        "Font" => dictionary! {
+                            "Helv" => dictionary! {
+                                "Type" => "Font",
+                                "Subtype" => "Type1",
+                                "BaseFont" => "Helvetica",
+                                "Encoding" => "WinAnsiEncoding",
+                            }
+                        }
+                    },
+                };
+                let ap_ref = doc.add_object(lopdf::Stream::new(ap_dict, ap_content.into_bytes()));
+                d.set("AP", dictionary! { "N" => Object::Reference(ap_ref) });
             }
             d
         }

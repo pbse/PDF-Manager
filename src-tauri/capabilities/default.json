@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/capabilities.json",
+  "identifier": "default",
+  "description": "Default permissions for the PDF Manager application.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "dialog:default",
+    "opener:default",
+    "shell:default",
+    "os:default"
+  ]
+}

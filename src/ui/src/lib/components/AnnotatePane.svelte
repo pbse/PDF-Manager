@@ -19,6 +19,8 @@
     return [((intVal >> 16) & 255) / 255, ((intVal >> 8) & 255) / 255, (intVal & 255) / 255];
   }
 
+  let makePermanent = $state(false);
+
   async function handleAnnotate() {
     if (!pdfState.selectedAnnotateFile) { appState.showStatus("Please select a PDF to annotate.", true); return; }
     if (!pdfState.viewerPageNumber || pdfState.viewerPageNumber <= 0) { appState.showStatus("Enter a valid page number.", true); return; }
@@ -33,7 +35,13 @@
     appState.startLoading("Adding annotation...");
     try {
       await invoke("add_annotation", { path: pdfState.selectedAnnotateFile, page: pdfState.viewerPageNumber, rect: rectArray, kind: pdfState.annotationType, contents: pdfState.annotationText || null, color: colorArray, outputPath });
-      appState.showStatus(`Annotation added successfully.`, false, outputPath);
+      
+      if (makePermanent) {
+        appState.startLoading("Burning annotation into content...");
+        await invoke("flatten_annotations", { path: outputPath, outputPath: outputPath });
+      }
+
+      appState.showStatus(`Annotation added successfully ${makePermanent ? '(Permanent)' : ''}.`, false, outputPath);
       await invoke("shell_open", { filePath: outputPath });
     } catch (err) { appState.showStatus(`Error adding annotation: ${err}`, true); }
   }
@@ -72,6 +80,10 @@
         <button onclick={annotateCurrent} class="w-full py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-bold transition-all shadow-md hover:bg-blue-700 uppercase tracking-tight">
           Annotate Current
         </button>
+      {:else if !pdfState.viewerFilePath && pdfState.selectedAnnotateFile}
+        <button onclick={() => openViewer('rect')} class="w-full py-2 px-4 bg-green-600 text-white rounded-md text-sm font-bold transition-all shadow-md hover:bg-green-700 uppercase tracking-tight">
+          Open Viewer
+        </button>
       {/if}
       <button onclick={selectFile} class="w-full py-2 px-4 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-sm font-medium transition-colors shadow-sm">
         {pdfState.selectedAnnotateFile ? pdfState.selectedAnnotateFile.split(/[/\\]/).pop() : 'Select PDF'}
@@ -104,8 +116,17 @@
         <input id="annotate-content" type="text" bind:value={pdfState.annotationText} class="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm text-slate-900 dark:text-white outline-none transition-colors focus:ring-2 focus:ring-blue-500 shadow-sm" />
       </div>
 
-      <button onclick={handleAnnotate} disabled={!pdfState.selectedAnnotateFile || !pdfState.annotationRectInput} class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02]">
-        {!pdfState.selectedAnnotateFile ? 'Select PDF' : !pdfState.annotationRectInput ? 'Select Area' : 'Apply Annotation'}
+      <label class="flex items-center gap-2 cursor-pointer pt-2 group">
+        <input type="checkbox" bind:checked={makePermanent} class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all" />
+        <span class="text-[10px] font-bold text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors uppercase tracking-tight">Make Permanent (Flatten)</span>
+      </label>
+
+      <button 
+        onclick={() => !pdfState.annotationRectInput ? openViewer('rect') : handleAnnotate()} 
+        disabled={!pdfState.selectedAnnotateFile} 
+        class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {!pdfState.selectedAnnotateFile ? 'Select PDF' : !pdfState.annotationRectInput ? 'Enter Selection Mode' : 'Apply Annotation'}
       </button>
     </div>
   </div>

@@ -50,14 +50,15 @@
   }
 
   async function selectFile(num: 1 | 2) {
-    const result = await invoke<string>("open_file_dialog", { multiple: false });
-    if (result) {
+    const result = await invoke<string[]>("open_file_dialog", { multiple: false });
+    if (result && result.length > 0) {
+      const path = result[0];
       if (num === 1) {
-        file1 = result;
-        pdfState.openTab(result);
+        file1 = path;
+        pdfState.openTab(path);
       } else {
-        file2 = result;
-        pdfState.openTab(result);
+        file2 = path;
+        pdfState.openTab(path);
       }
     }
   }

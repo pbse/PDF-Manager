@@ -46,6 +46,7 @@
           onclick={() => pdfState.activeTool === tool.id ? pdfState.activeTool = 'peek' : pdfState.switchTool(tool.id)}
           class="w-full aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-300 {pdfState.activeTool === tool.id ? 'bg-blue-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-blue-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400'}"
           title={tool.label}
+          data-testid="tool-button-{tool.id}"
         >
           <span class="text-xl">{tool.icon}</span>
           {#if !isCollapsed}
@@ -65,6 +66,7 @@
           onclick={() => pdfState.activeTool === tool.id ? pdfState.activeTool = 'peek' : pdfState.switchTool(tool.id)}
           class="w-full aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-300 {pdfState.activeTool === tool.id ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-indigo-50 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}"
           title={tool.label}
+          data-testid="tool-button-{tool.id}"
         >
           <span class="text-xl">{tool.icon}</span>
           {#if !isCollapsed}
