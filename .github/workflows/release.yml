@@ -32,8 +32,11 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Install frontend dependencies
+      - name: Install root dependencies
         run: npm install
+
+      - name: Install UI dependencies
+        run: npm install --prefix src/ui
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
