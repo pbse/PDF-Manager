@@ -3611,34 +3611,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pinnacle"
-version = "1.0.0"
-dependencies = [
- "chrono",
- "hex",
- "image",
- "lopdf 0.34.0",
- "notify",
- "notify-rust",
- "openssl",
- "pdf-extract",
- "printpdf",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-shell",
- "tempfile",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3789,6 +3761,34 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pinnacle"
+version = "1.0.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "image",
+ "lopdf 0.34.0",
+ "notify",
+ "notify-rust",
+ "openssl",
+ "pdf-extract",
+ "printpdf",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-shell",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "piper"

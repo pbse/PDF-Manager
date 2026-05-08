@@ -30,4 +30,8 @@ src/ui/.svelte-kit/
 # Gemini Instructions
 GEMINI.md
 
+# test results
+test-results/
+src/ui/test-results/
+src/ui/playwright-report/
 \n# Test Results\ntest-results/\n**/test-results/

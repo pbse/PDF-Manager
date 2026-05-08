@@ -13,7 +13,10 @@
         "dev:ios": "tauri ios dev",
         "build:android": "tauri android build",
         "dev:android": "tauri android dev",
-        "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
+        "test:backend": "cargo test --manifest-path src-tauri/Cargo.toml",
+        "test:ui": "npm --prefix src/ui run test:ui",
+        "test:e2e": "npm --prefix src/ui run test:e2e",
+        "test": "npm run test:backend && npm run test:ui && npm run test:e2e"
     },
     "devDependencies": {
         "@tauri-apps/cli": "^2.4.0"
