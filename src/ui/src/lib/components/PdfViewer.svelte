@@ -4,6 +4,9 @@
   import { browser } from "$app/environment";
   import Tesseract from "tesseract.js";
   import { pdfState } from "$lib/state/pdfState.svelte";
+  import { appState } from "$lib/state/appState.svelte";
+  import { chatState } from "$lib/state/chatState.svelte";
+  import { fly, fade } from "svelte/transition";
 
   let {
     filePath = "",
@@ -180,8 +183,8 @@
       // Parallelize non-critical tasks
       Promise.all([
         generateThumbnails(),
-        invoke("get_pdf_outline", { path: filePath }).then(o => outline = o).catch(() => outline = []),
-        invoke("get_annotations", { path: filePath }).then(a => annotations = a).catch(() => annotations = []),
+        invoke("get_pdf_outline", { path: filePath }).then(o => outline = o as any[]).catch(() => outline = []),
+        invoke("get_annotations", { path: filePath }).then(a => annotations = a as any[]).catch(() => annotations = []),
         pdfState.loadBookmarks(filePath).catch(() => {}),
         pdfState.getReadingProgress(filePath).then(p => { pageNumber = p; })
       ]);
@@ -649,7 +652,7 @@
         >
           {#if sidebarTab === 'thumbs'}
             <div class="relative" style="height: {thumbnails.length * ITEM_HEIGHT}px">
-              {#each visibleThumbnails as thumb, i}
+              {#each visibleThumbnails as thumb}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div 
                   draggable="true"
@@ -657,7 +660,7 @@
                   ondragover={(e) => handleDragOver(e, thumbnails.findIndex(t => t.pageNumber === thumb.pageNumber))}
                   ondrop={handleDrop}
                   class="absolute left-0 right-0 flex flex-col items-center gap-2 group cursor-grab active:cursor-grabbing px-2"
-                  style="top: {thumb.offset}px; height: {ITEM_HEIGHT}px"
+                  style="top: {(thumb as any).offset}px; height: {ITEM_HEIGHT}px"
                 >
                   <button 
                     onclick={() => pageNumber = thumb.pageNumber}
@@ -680,7 +683,7 @@
                 <div class="text-[10px] text-slate-400 italic text-center py-8">No Table of Contents found.</div>
               {/if}
             </div>
-          {:else}
+          {:else if sidebarTab === 'bookmarks'}
             <div class="space-y-2">
               <div class="flex justify-between items-center mb-4 px-1">
                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Page: {pageNumber}</span>
@@ -711,7 +714,7 @@
                 <div class="text-[10px] text-slate-400 italic text-center py-8 px-4">Save points of interest to access them instantly.</div>
               {/if}
             </div>
-          {:else}
+          {:else if sidebarTab === 'annots'}
             <div class="space-y-2">
               <h3 class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Document Markup</h3>
               {#each annotations as annot}

@@ -4,7 +4,7 @@ import { historyState } from "./historyState.svelte";
 import { db, type BookmarkRecord, type VersionRecord, type NoteRecord, type DocumentRecord } from "./db";
 
 export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings";
-export type SelectionTarget = "parse" | "split" | "rotate" | "delete" | "annotate" | "signature" | "security" | "extract" | "crypto";
+export type SelectionTarget = "parse" | "split" | "rotate" | "delete" | "annotate" | "signature" | "security" | "extract" | "crypto" | "organize";
 
 const state = $state({
   activeTool: "merge" as ToolId,
@@ -259,6 +259,10 @@ const state = $state({
       case "split": state.selectedSplitFile = path; break;
       case "rotate": state.selectedRotateFile = path; break;
       case "delete": state.selectedDeleteFile = path; break;
+      case "organize": 
+        state.selectedRotateFile = path;
+        state.selectedDeleteFile = path;
+        break;
       case "annotate": state.selectedAnnotateFile = path; break;
       case "signature": state.selectedSignatureFile = path; break;
       case "security": 

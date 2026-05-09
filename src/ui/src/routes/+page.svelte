@@ -383,7 +383,7 @@
                 onprev={() => (pdfState.viewerPageNumber = Math.max(1, pdfState.viewerPageNumber - 1))}
                 onnext={() => pdfState.viewerPageNumber++}
                 onclose={() => (pdfState.viewerFilePath = "")}
-                onreorder={(newOrder) => {
+                onreorder={(newOrder: number[]) => {
                   if (pdfState.viewerTarget === 'rotate') {
                    invoke("save_file_dialog", { defaultPath: "reordered.pdf" }).then(outputPath => {
                      if (!outputPath) return;

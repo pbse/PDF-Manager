@@ -67,7 +67,7 @@
       </div>
       <button 
         onclick={() => !pdfState.selectedSplitFile ? pdfState.selectFile('split') : handleSplit()} 
-        disabled={pdfState.selectedSplitFile && !pdfState.splitPagesInput} 
+        disabled={!!pdfState.selectedSplitFile && !pdfState.splitPagesInput} 
         class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs uppercase tracking-widest transition-colors shadow-md shadow-blue-500/10"
       >
         {!pdfState.selectedSplitFile ? 'Select PDF' : !pdfState.splitPagesInput ? 'Enter Range' : 'Save Range'}

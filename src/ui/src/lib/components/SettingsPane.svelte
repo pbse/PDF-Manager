@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { chatState } from "$lib/state/chatState.svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { pdfState } from "$lib/state/pdfState.svelte";
   import { appState } from "$lib/state/appState.svelte";
+  import { historyState } from "$lib/state/historyState.svelte";
+  import { chatState } from "$lib/state/chatState.svelte";
   import ToolPane from "./ToolPane.svelte";
 
   let ollamaUrl = $state("http://localhost:11434");

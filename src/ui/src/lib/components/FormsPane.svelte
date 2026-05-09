@@ -61,7 +61,7 @@
 
     <button 
       onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : scanFields()} 
-      disabled={pdfState.viewerFilePath && isScanning}
+      disabled={!!pdfState.viewerFilePath && isScanning}
       class="w-full py-2 bg-blue-600 text-white rounded font-bold text-[10px] uppercase tracking-widest shadow-md"
     >
       {!pdfState.viewerFilePath ? 'Select PDF' : isScanning ? 'Scanning...' : 'Scan for Fields'}
