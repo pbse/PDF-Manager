@@ -54,7 +54,6 @@ mod tests {
     use super::*;
     use crate::pdf::test_utils::create_minimal_pdf;
     use lopdf::Document;
-    use std::fs;
     use std::path::PathBuf;
 
     struct TestEnvironment {
@@ -65,20 +64,8 @@ mod tests {
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
-            let unique_suffix = format!("{}", test_name);
-
-            let test_dir = PathBuf::from("target/test_data_remover").join(&unique_suffix);
-            let output_dir = PathBuf::from("target/test_output_remover").join(&unique_suffix);
-
-            if test_dir.exists() {
-                fs::remove_dir_all(&test_dir).ok();
-            }
-            if output_dir.exists() {
-                fs::remove_dir_all(&output_dir).ok();
-            }
-
-            fs::create_dir_all(&test_dir).expect("Failed to create unique test data directory");
-            fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
+            use crate::pdf::test_utils::setup_unique_paths;
+            let (test_dir, output_dir) = setup_unique_paths(test_name);
 
             let input_pdf_path = test_dir.join("sample.pdf");
             create_minimal_pdf(input_pdf_path.to_str().unwrap(), 5, "Sample")
@@ -106,8 +93,8 @@ mod tests {
 
     impl Drop for TestEnvironment {
         fn drop(&mut self) {
-            fs::remove_dir_all(&self.test_dir).ok();
-            fs::remove_dir_all(&self.output_dir).ok();
+            use crate::pdf::test_utils::teardown_unique_paths;
+            teardown_unique_paths(&self.test_dir, &self.output_dir);
         }
     }
 

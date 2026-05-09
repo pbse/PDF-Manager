@@ -151,7 +151,7 @@ mod tests {
     use lopdf::Document;
     use std::fs;
     use std::io::Write; // For creating non-pdf file test
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
@@ -163,29 +163,8 @@ mod tests {
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
-            let unique_suffix = format!("{}", test_name);
-
-            // Place artifacts in target/ directory
-            let base_data_dir = PathBuf::from("target/test_data_extractor");
-            let base_output_dir = PathBuf::from("target/test_output_extractor");
-            // Ensure base dirs exist to avoid InvalidInput on some platforms
-            fs::create_dir_all(&base_data_dir).ok();
-            fs::create_dir_all(&base_output_dir).ok();
-
-            let test_dir = base_data_dir.join(&unique_suffix);
-            let output_dir = base_output_dir.join(&unique_suffix);
-
-            // Clean up potential remnants from previous runs of THIS specific test
-            if test_dir.exists() {
-                fs::remove_dir_all(&test_dir).ok();
-            }
-            if output_dir.exists() {
-                fs::remove_dir_all(&output_dir).ok();
-            }
-
-            // Create fresh dirs
-            fs::create_dir_all(&test_dir).expect("Failed to create unique test data directory");
-            fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
+            use crate::pdf::test_utils::setup_unique_paths;
+            let (test_dir, output_dir) = setup_unique_paths(test_name);
 
             // Define and create the primary input PDF
             let input_pdf_path = test_dir.join("sample.pdf");
@@ -217,9 +196,8 @@ mod tests {
     // Implement Drop for automatic cleanup
     impl Drop for TestEnvironment {
         fn drop(&mut self) {
-            // Use remove_dir_all for resilience, ignore errors during cleanup
-            fs::remove_dir_all(&self.test_dir).ok();
-            fs::remove_dir_all(&self.output_dir).ok();
+            use crate::pdf::test_utils::teardown_unique_paths;
+            teardown_unique_paths(&self.test_dir, &self.output_dir);
         }
     }
 
@@ -315,27 +293,26 @@ mod tests {
 
     #[test]
     fn test_extract_pdf_input_not_found() {
-        let bad_input_path = "target/test_data_extractor/non_existent_dir/no_way_this_exists.pdf";
-        fs::remove_file(bad_input_path).ok();
-        if let Some(parent) = Path::new(bad_input_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
-        let output_path = "target/test_output_extractor/output_for_bad_input.pdf";
-        if let Some(parent) = Path::new(output_path).parent() {
-            fs::create_dir_all(parent).ok();
-        }
+        use crate::pdf::test_utils::{setup_unique_paths, teardown_unique_paths};
+        let (test_dir, output_dir) = setup_unique_paths("extract_not_found_input");
+        
+        let bad_input_path = test_dir.join("no_way_this_exists.pdf");
+        let output_path = output_dir.join("output_for_bad_input.pdf");
 
         let page_to_extract = 1;
-        let result = extract_pdf_page(bad_input_path, page_to_extract, output_path);
+        let result = extract_pdf_page(
+            bad_input_path.to_str().unwrap(),
+            page_to_extract,
+            output_path.to_str().unwrap(),
+        );
 
         assert!(result.is_err());
         if let Err(e) = result {
             println!("Expected error: {}", e);
             assert!(e.contains("Input file not found"), "Error message mismatch");
         }
-        if let Some(parent) = Path::new(output_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        
+        teardown_unique_paths(&test_dir, &output_dir);
     }
 
     #[test]

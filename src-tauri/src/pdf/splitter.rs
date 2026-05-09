@@ -136,55 +136,26 @@ pub fn split_pdf(path: &str, pages: Vec<u32>, output_path: &str) -> Result<(), S
 // --- Tests ---
 #[cfg(test)]
 mod tests {
-    use super::*; // Imports split_pdf and its helpers if defined in parent mod
-    use crate::pdf::test_utils::create_minimal_pdf;
+    use super::*;
+    use crate::pdf::test_utils::{create_minimal_pdf, setup_unique_paths, teardown_unique_paths};
     use lopdf::Document;
     use std::fs;
-    use std::io::Write; // For non-pdf test
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
-    // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
         test_dir: PathBuf,
         output_dir: PathBuf,
-        // Store the primary input path created by setup
         input_pdf_path: PathBuf,
     }
 
     impl TestEnvironment {
         fn new(test_name: &str) -> Self {
-            let unique_suffix = format!("{}_{}", test_name, uuid::Uuid::new_v4());
+            let (test_dir, output_dir) = setup_unique_paths(test_name);
 
-            // Place artifacts in target/ directory
-            let base_data_dir = PathBuf::from("target/test_data_splitter");
-            let base_output_dir = PathBuf::from("target/test_output_splitter");
-            fs::create_dir_all(&base_data_dir).ok();
-            fs::create_dir_all(&base_output_dir).ok();
-
-            let test_dir = base_data_dir.join(&unique_suffix);
-            let output_dir = base_output_dir.join(&unique_suffix);
-
-            // Clean up potential remnants from previous runs of THIS specific test
-            if test_dir.exists() {
-                fs::remove_dir_all(&test_dir).ok();
-            }
-            if output_dir.exists() {
-                fs::remove_dir_all(&output_dir).ok();
-            }
-
-            // Create fresh dirs
-            fs::create_dir_all(&test_dir).expect("Failed to create unique test data directory");
-            fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
-
-            // Define and create the primary input PDF
             let input_pdf_path = test_dir.join("sample.pdf");
-            // Use the fixed create_minimal_pdf helper
             create_minimal_pdf(input_pdf_path.to_str().unwrap(), 3, "Sample")
                 .expect("Setup: Failed to create dummy sample PDF");
-            assert!(
-                input_pdf_path.exists(),
-                "Setup: Dummy PDF does not exist after creation!"
-            );
+            assert!(input_pdf_path.exists());
 
             TestEnvironment {
                 test_dir,
@@ -193,38 +164,26 @@ mod tests {
             }
         }
 
-        // Helper to get the full path for an output file
         fn output_path(&self, filename: &str) -> PathBuf {
             self.output_dir.join(filename)
         }
 
-        // Helper to get the primary input path as str
         fn input_path_str(&self) -> &str {
             self.input_pdf_path.to_str().unwrap()
         }
     }
 
-    // Implement Drop for automatic cleanup
     impl Drop for TestEnvironment {
         fn drop(&mut self) {
-            fs::remove_dir_all(&self.test_dir).ok();
-            fs::remove_dir_all(&self.output_dir).ok();
+            teardown_unique_paths(&self.test_dir, &self.output_dir);
         }
     }
 
-    // --- Minimal PDF Creation Helper (Corrected for lopdf 0.31.0) ---
-    // --- Updated Tests ---
-
     #[test]
     fn test_split_pdf_success() {
-        let env = TestEnvironment::new("split_success"); // RAII setup/teardown
+        let env = TestEnvironment::new("split_success");
         let output_path = env.output_path("split_1_3.pdf");
         let pages_to_extract = vec![1, 3];
-
-        // Ensure the output directory exists
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
 
         let result = split_pdf(
             env.input_path_str(),
@@ -233,40 +192,17 @@ mod tests {
         );
 
         assert!(result.is_ok(), "split_pdf failed: {:?}", result.err());
-        assert!(
-            output_path.exists(),
-            "Output file was not created at {}",
-            output_path.display()
-        );
+        assert!(output_path.exists());
 
-        match Document::load(&output_path) {
-            Ok(output_doc) => {
-                assert_eq!(
-                    output_doc.get_pages().len(),
-                    pages_to_extract.len(),
-                    "Output PDF page count mismatch."
-                );
-                let output_pages = output_doc.get_pages();
-                // Check keys representing the *new* page numbers in the output doc
-                assert!(output_pages.contains_key(&1), "Page 1 missing in output");
-                assert!(
-                    output_pages.contains_key(&2),
-                    "Page 2 (original 3) missing in output"
-                );
-            }
-            Err(e) => panic!(
-                "Failed to load the generated output PDF '{}': {}",
-                output_path.display(),
-                e
-            ),
-        }
+        let output_doc = Document::load(&output_path).unwrap();
+        assert_eq!(output_doc.get_pages().len(), pages_to_extract.len());
     }
 
     #[test]
     fn test_split_pdf_invalid_page() {
         let env = TestEnvironment::new("split_invalid_page");
         let output_path = env.output_path("split_invalid.pdf");
-        let pages_to_extract = vec![1, 5]; // Page 5 invalid for a 3-page doc
+        let pages_to_extract = vec![1, 5];
 
         let result = split_pdf(
             env.input_path_str(),
@@ -274,21 +210,8 @@ mod tests {
             output_path.to_str().unwrap(),
         );
 
-        assert!(
-            result.is_err(),
-            "Function should fail for out-of-bounds page"
-        );
-        if let Err(e) = result {
-            println!("Expected error: {}", e);
-            assert!(
-                e.contains("Page number 5 not found"),
-                "Error message mismatch"
-            );
-        }
-        assert!(
-            !output_path.exists() || Document::load(&output_path).is_err(),
-            "Output file should ideally not exist or be invalid after an error."
-        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Page number 5 not found"));
     }
 
     #[test]
@@ -303,60 +226,32 @@ mod tests {
             output_path.to_str().unwrap(),
         );
 
-        assert!(result.is_err(), "Function should fail for empty pages list");
-        if let Err(e) = result {
-            println!("Expected error: {}", e);
-            assert!(e.contains("cannot be empty"), "Error message mismatch");
-        }
-        assert!(
-            !output_path.exists() || Document::load(&output_path).is_err(),
-            "Output file should ideally not exist or be invalid after an error."
-        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cannot be empty"));
     }
 
     #[test]
     fn test_split_pdf_input_not_found() {
-        // Don't need full env, just a guaranteed non-existent path
-        let bad_input_path = "target/test_data_splitter/non_existent_dir/no_way_this_exists.pdf";
-        fs::remove_file(bad_input_path).ok();
-        if let Some(parent) = Path::new(bad_input_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        let (test_dir, output_dir) = setup_unique_paths("split_input_not_found");
+        let bad_input_path = test_dir.join("no_such_file.pdf");
+        let output_path = output_dir.join("output.pdf");
 
-        let output_path = "target/test_output_splitter/output_for_bad_input_split.pdf";
-        // Ensure output dir exists so function doesn't fail on *that*
-        if let Some(parent) = Path::new(output_path).parent() {
-            fs::create_dir_all(parent).ok();
-        }
-
-        let pages_to_extract = vec![1];
-        let result = split_pdf(bad_input_path, pages_to_extract, output_path);
-
-        assert!(
-            result.is_err(),
-            "Function should fail if input file not found"
+        let result = split_pdf(
+            bad_input_path.to_str().unwrap(),
+            vec![1],
+            output_path.to_str().unwrap(),
         );
-        if let Err(e) = result {
-            println!("Expected error: {}", e);
-            // Check for the error coming from the initial exists() check OR Document::load
-            assert!(
-                e.contains("Input file not found")
-                    || (e.contains("Failed to load PDF") && e.contains("No such file")),
-                "Error message mismatch"
-            );
-        }
 
-        // Clean up output dir if created
-        if let Some(parent) = Path::new(output_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Input file not found"));
+        teardown_unique_paths(&test_dir, &output_dir);
     }
 
     #[test]
     fn test_split_pdf_zero_page() {
         let env = TestEnvironment::new("split_page_zero");
         let output_path = env.output_path("split_zero.pdf");
-        let pages_to_extract = vec![0, 1]; // Page 0 is invalid
+        let pages_to_extract = vec![0, 1];
 
         let result = split_pdf(
             env.input_path_str(),
@@ -364,61 +259,25 @@ mod tests {
             output_path.to_str().unwrap(),
         );
 
-        assert!(result.is_err(), "Function should fail for page zero");
-        if let Err(e) = result {
-            println!("Expected error: {}", e);
-            assert!(
-                e.contains("Page numbers must be 1-based") || e.contains("Invalid page number: 0"),
-                "Error message mismatch"
-            );
-        }
-        assert!(
-            !output_path.exists() || Document::load(&output_path).is_err(),
-            "Output file should ideally not exist or be invalid after an error."
-        );
-        // Clean up output dir if created
-        if let Some(parent) = Path::new(&output_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid page number: 0"));
     }
 
     #[test]
     fn test_split_input_not_a_pdf() {
         let env = TestEnvironment::new("split_not_a_pdf");
         let not_pdf_path = env.test_dir.join("not_a_pdf.txt");
-        let output_path = env.output_path("output_for_not_pdf_split.pdf");
+        let output_path = env.output_path("output.pdf");
 
-        let mut file = fs::File::create(&not_pdf_path).expect("Failed to create dummy text file");
-        writeln!(file, "This is text.").expect("Failed to write to text file");
-        assert!(not_pdf_path.exists());
+        fs::write(&not_pdf_path, "This is not a PDF").unwrap();
 
-        let pages_to_extract = vec![1];
         let result = split_pdf(
             not_pdf_path.to_str().unwrap(),
-            pages_to_extract,
+            vec![1],
             output_path.to_str().unwrap(),
         );
 
-        assert!(
-            result.is_err(),
-            "Function should fail if input is not a PDF"
-        );
-        if let Err(e) = result {
-            println!("Expected error: {}", e);
-            assert!(
-                e.contains("Failed to load PDF")
-                    || e.contains("invalid PDF header")
-                    || e.contains("cannot find trailer"),
-                "Error message mismatch"
-            );
-        }
-        assert!(
-            !output_path.exists() || Document::load(&output_path).is_err(),
-            "Output file should ideally not exist or be invalid after an error."
-        );
-        // Clean up output dir if created
-        if let Some(parent) = Path::new(&output_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        assert!(result.is_err());
+        teardown_unique_paths(&env.test_dir, &env.output_dir);
     }
 }

@@ -90,7 +90,6 @@ mod tests {
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     // --- RAII Guard for Test Environment ---
     struct TestEnvironment {
@@ -99,30 +98,11 @@ mod tests {
         output_dir: PathBuf,
     }
 
-    // Counter for unique test run IDs
-    static TEST_RUN_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
     impl TestEnvironment {
         /// Creates unique directories for a test run.
         fn new(test_name: &str) -> Self {
-            let run_id = TEST_RUN_COUNTER.fetch_add(1, Ordering::SeqCst);
-            let unique_suffix = format!("{}_{}", test_name, run_id);
-
-            // Place artifacts in target/ directory
-            let test_dir = PathBuf::from("target/test_data_parser").join(&unique_suffix);
-            let output_dir = PathBuf::from("target/test_output_parser").join(&unique_suffix);
-
-            // Clean up potential remnants from previous runs of THIS specific test
-            if test_dir.exists() {
-                fs::remove_dir_all(&test_dir).ok();
-            }
-            if output_dir.exists() {
-                fs::remove_dir_all(&output_dir).ok();
-            }
-
-            // Create fresh dirs
-            fs::create_dir_all(&test_dir).expect("Failed to create unique test data directory");
-            fs::create_dir_all(&output_dir).expect("Failed to create unique test output directory");
+            use crate::pdf::test_utils::setup_unique_paths;
+            let (test_dir, output_dir) = setup_unique_paths(test_name);
 
             TestEnvironment {
                 test_dir,
@@ -134,16 +114,13 @@ mod tests {
         fn test_dir(&self) -> &Path {
             &self.test_dir
         }
-
-        // Add other helpers if needed, e.g., output_dir()
     }
 
     // Implement Drop for automatic cleanup
     impl Drop for TestEnvironment {
         fn drop(&mut self) {
-            fs::remove_dir_all(&self.test_dir).ok();
-            fs::remove_dir_all(&self.output_dir).ok();
-            // println!("Cleaned up parser env: {} {}", self.base_name, self.run_id);
+            use crate::pdf::test_utils::teardown_unique_paths;
+            teardown_unique_paths(&self.test_dir, &self.output_dir);
         }
     }
 
@@ -324,14 +301,10 @@ mod tests {
 
     #[test]
     fn test_parse_pdf_file_not_found() {
-        // This test doesn't need the full environment setup
-        let bad_path = "target/test_data_parser/definitely_not_a_real_dir/no_such_file.pdf";
-        // Ensure it doesn't exist
-        fs::remove_file(bad_path).ok();
-        // Also remove the parent dir to be sure
-        if let Some(parent) = Path::new(bad_path).parent() {
-            fs::remove_dir_all(parent).ok();
-        }
+        use crate::pdf::test_utils::{setup_unique_paths, teardown_unique_paths};
+        let (test_dir, output_dir) = setup_unique_paths("parser_not_found");
+        let bad_path_buf = test_dir.join("no_way_this_exists.pdf");
+        let bad_path = bad_path_buf.to_str().unwrap();
 
         let result = parse_pdf(bad_path);
 
@@ -352,6 +325,8 @@ mod tests {
             "Error message should contain path: {}",
             err_msg
         );
+        
+        teardown_unique_paths(&test_dir, &output_dir);
     }
 
     #[test]
