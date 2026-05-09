@@ -230,10 +230,29 @@ export class ChatState {
 
     try {
       const docs = await db.documents.toArray();
+      
+      // Local RAG Retrieval: Score documents based on keyword frequency
+      const keywords = question.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+      
+      const scoredDocs = docs.map(doc => {
+        let score = 0;
+        const text = (doc.fullText || "").toLowerCase();
+        for (const kw of keywords) {
+          // Simple occurrence count for BM25-lite behavior
+          const count = text.split(kw).length - 1;
+          score += count;
+        }
+        return { doc, score };
+      });
+      
+      // Sort by relevance and take top 3
+      scoredDocs.sort((a, b) => b.score - a.score);
+      const topDocs = scoredDocs.filter(d => d.score > 0).slice(0, 3);
+
       let combinedContext = "";
-      for (const doc of docs) {
+      for (const { doc } of topDocs) {
         if (doc.fullText) {
-           combinedContext += `--- DOCUMENT: ${doc.name} ---\n${doc.fullText.substring(0, 5000)}\n\n`;
+           combinedContext += `--- DOCUMENT: ${doc.name} ---\n${doc.fullText.substring(0, 8000)}\n\n`;
         }
       }
       

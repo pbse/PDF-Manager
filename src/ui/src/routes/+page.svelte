@@ -369,7 +369,7 @@
             <div class="w-full h-full min-h-0 flex justify-center items-start overflow-hidden">
               <PdfViewer
                 filePath={pdfState.viewerFilePath}
-                pageNumber={pdfState.viewerPageNumber}
+                bind:pageNumber={pdfState.viewerPageNumber}
                 mode={pdfState.viewerMode}
                 previewRect={currentPreviewRect}
                 previewStrokes={currentPreviewStrokes}

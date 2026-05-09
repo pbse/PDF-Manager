@@ -10,7 +10,7 @@
 
   let {
     filePath = "",
-    pageNumber = 1,
+    pageNumber = $bindable(1),
     mode = "view",
     previewRect = null,
     previewStrokes = [],

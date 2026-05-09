@@ -24,6 +24,24 @@ describe('PdfState Rune', () => {
     expect(pdfState.selectedSplitFile).toBe('/test/file.pdf');
   });
 
+  it('should handle smart citation jumping', () => {
+    // Open a completely different file first
+    pdfState.openTab('/another.pdf');
+    pdfState.viewerPageNumber = 5;
+
+    // Simulate clicking a citation
+    const citation = { docPath: '/test/source.pdf', pageNumber: 42, text: 'This is the cited snippet.' };
+    pdfState.openTab(citation.docPath);
+    pdfState.viewerPageNumber = citation.pageNumber;
+    pdfState.highlightedSnippet = citation.text;
+
+    expect(pdfState.viewerFilePath).toBe('/test/source.pdf');
+    expect(pdfState.viewerPageNumber).toBe(42);
+    expect(pdfState.highlightedSnippet).toBe('This is the cited snippet.');
+    // Check that it's actually in openTabs
+    expect(pdfState.openTabs).toContain('/test/source.pdf');
+  });
+
   it('should handle tab management', () => {
     pdfState.openTab('/a.pdf');
     pdfState.openTab('/b.pdf');

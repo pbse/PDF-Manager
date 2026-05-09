@@ -146,6 +146,7 @@ export class HistoryState {
     let fullText = existing?.fullText;
     let thumbnail = existing?.thumbnail;
     let hash = existing?.hash;
+    let summary = existing?.summary;
     
     if (!fullText || !thumbnail || !hash) {
       try {
@@ -166,13 +167,47 @@ export class HistoryState {
       tags: existing?.tags || [],
       fullText,
       thumbnail,
-      hash
+      hash,
+      summary
     };
 
     if (existing?.id) record.id = existing.id;
     
     await db.documents.put(record);
     await this.loadHistory();
+
+    // Auto-indexing in background
+    this.autoIndexDocument(path, fullText);
+  }
+
+  private async autoIndexDocument(path: string, fullText: string | undefined) {
+    if (!fullText) return;
+    
+    const existing = await db.documents.where('path').equals(path).first();
+    let updated = false;
+    let newSummary = existing?.summary;
+    const { chatState } = await import('./chatState.svelte');
+    
+    // 1. Extract Summary
+    if (!existing?.summary) {
+      try {
+        newSummary = await chatState.nameDocument(path);
+        updated = true;
+      } catch (e) { console.error("Auto-summarization failed", e); }
+    }
+
+    // 2. Extract Entities
+    try {
+      const insights = await chatState.getDocumentInsights(path);
+      if (insights && (insights.dates?.length > 0 || insights.amounts?.length > 0 || insights.orgs?.length > 0)) {
+        await this.indexEntities(path, insights);
+      }
+    } catch (e) { console.error("Auto-entity extraction failed", e); }
+
+    if (updated && newSummary && existing?.id) {
+       await db.documents.update(existing.id, { summary: newSummary });
+       await this.loadHistory();
+    }
   }
 
   async findDuplicates(): Promise<HistoryItem[][]> {
