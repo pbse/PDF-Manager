@@ -45,6 +45,7 @@ jobs:
 
       - name: Run Backend Tests
         run: cargo test
+        working-directory: src-tauri
 
       - name: Run Frontend Unit Tests
         run: npm run test:ui
