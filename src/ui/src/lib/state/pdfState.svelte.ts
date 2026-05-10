@@ -3,7 +3,7 @@ import { appState } from "./appState.svelte";
 import { historyState } from "./historyState.svelte";
 import { db, type BookmarkRecord, type VersionRecord, type NoteRecord, type DocumentRecord } from "./db";
 
-export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings" | "insights";
+export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings" | "insights" | "compress";
 export type SelectionTarget = "parse" | "split" | "rotate" | "delete" | "annotate" | "signature" | "security" | "extract" | "crypto" | "organize";
 
 const state = $state({
@@ -31,7 +31,8 @@ const state = $state({
   rotatePagesInput: "",
   deletePagesInput: "",
   annotationRectInput: "",
-  annotationType: "highlight" as "highlight" | "underline" | "strikeout" | "note",
+  annotationStrokes: [] as [number, number][][],
+  annotationType: "highlight" as "highlight" | "underline" | "strikeout" | "note" | "square" | "circle" | "ink",
   annotationText: "",
   annotationColor: "#facc15",
   signatureRectInput: "",
@@ -71,6 +72,7 @@ const state = $state({
         state.viewerTarget = 'security';
       }
       if (id === 'extract') state.selectedExtractFile = state.viewerFilePath;
+      if (id === 'compress') state.selectedCryptoFile = state.viewerFilePath;
       if (id === 'organize') {
         state.selectedRotateFile = state.viewerFilePath;
         state.selectedDeleteFile = state.viewerFilePath;
@@ -97,11 +99,14 @@ const state = $state({
     }
 
     state.signatureStrokes = [];
+    state.annotationStrokes = [];
     state.annotationRectInput = "";
     state.signatureRectInput = "";
     state.signRectInput = "";
     
-    if (!['annotate', 'signature', 'security'].includes(id)) {
+    if (id === 'annotate' && state.annotationType === 'ink') {
+      state.viewerMode = 'points';
+    } else if (!['annotate', 'signature', 'security'].includes(id)) {
       state.viewerMode = "view";
     }
     
@@ -229,10 +234,12 @@ const state = $state({
       const lastState = state.history.pop();
       state.redoStack.push(JSON.parse(JSON.stringify({
         signatureStrokes: state.signatureStrokes,
+        annotationStrokes: state.annotationStrokes,
         annotationRectInput: state.annotationRectInput,
         signatureRectInput: state.signatureRectInput
       })));
       state.signatureStrokes = lastState.signatureStrokes;
+      state.annotationStrokes = lastState.annotationStrokes;
       state.annotationRectInput = lastState.annotationRectInput;
       state.signatureRectInput = lastState.signatureRectInput;
     }
@@ -243,10 +250,12 @@ const state = $state({
       const nextState = state.redoStack.pop();
       state.history.push(JSON.parse(JSON.stringify({
         signatureStrokes: state.signatureStrokes,
+        annotationStrokes: state.annotationStrokes,
         annotationRectInput: state.annotationRectInput,
         signatureRectInput: state.signatureRectInput
       })));
       state.signatureStrokes = nextState.signatureStrokes;
+      state.annotationStrokes = nextState.annotationStrokes;
       state.annotationRectInput = nextState.annotationRectInput;
       state.signatureRectInput = nextState.signatureRectInput;
     }

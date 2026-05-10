@@ -26,6 +26,7 @@
   import ComparePane from "$lib/components/ComparePane.svelte";
   import LibraryPane from "$lib/components/LibraryPane.svelte";
   import FormsPane from "$lib/components/FormsPane.svelte";
+  import CompressionPane from "$lib/components/CompressionPane.svelte";
   import VersionsPane from "$lib/components/VersionsPane.svelte";
   import WatermarkPane from "$lib/components/WatermarkPane.svelte";
   import NotepadPane from "$lib/components/NotepadPane.svelte";
@@ -47,7 +48,7 @@
   let overlaySliderPos = $state(50); // percentage
   
   const intelligenceTools = ['extract', 'compare', 'notepad', 'library', 'versions', 'settings', 'insights'];
-  const operationTools = ['merge', 'split', 'annotate', 'signature', 'security', 'organize', 'forms', 'watermark'];
+  const operationTools = ['merge', 'split', 'annotate', 'signature', 'security', 'organize', 'forms', 'watermark', 'compress'];
 
   const toolPanes: Record<string, any> = {
     extract: ExtractPane,
@@ -64,7 +65,8 @@
     security: SecurityPane,
     organize: OrganizePane,
     forms: FormsPane,
-    watermark: WatermarkPane
+    watermark: WatermarkPane,
+    compress: CompressionPane
   };
 
   // --- Derived State (Directly from pdfState for maximum reactivity) ---
@@ -78,7 +80,13 @@
           : null
   );
 
-  let currentPreviewStrokes = $derived(pdfState.activeTool === "signature" ? pdfState.signatureStrokes : []);
+  let currentPreviewStrokes = $derived(
+    pdfState.activeTool === "signature" 
+      ? pdfState.signatureStrokes 
+      : pdfState.activeTool === "annotate" 
+        ? pdfState.annotationStrokes 
+        : []
+  );
 
   let currentPreviewColor = $derived(
     pdfState.activeTool === "annotate"
@@ -124,14 +132,22 @@
           const maxY = Math.max(...ys) + 5;
           pdfState.signatureRectInput = `${Math.round(minX)}, ${Math.round(minY)}, ${Math.round(maxX)}, ${Math.round(maxY)}`;
         }
+      } else if (pdfState.viewerTarget === "annotate") {
+        pdfState.annotationStrokes = selectedStrokes;
       }
     }
   }
 
   function handleViewerClear() {
     switch (pdfState.viewerTarget) {
-      case "annotate": pdfState.annotationRectInput = ""; break;
-      case "signature": pdfState.signatureStrokes = []; pdfState.signatureRectInput = ""; break;
+      case "annotate": 
+        pdfState.annotationRectInput = ""; 
+        pdfState.annotationStrokes = [];
+        break;
+      case "signature": 
+        pdfState.signatureStrokes = []; 
+        pdfState.signatureRectInput = ""; 
+        break;
       case "security": pdfState.signRectInput = ""; break;
     }
   }

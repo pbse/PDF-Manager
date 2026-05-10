@@ -20,6 +20,7 @@
     { id: "organize", label: "Organize", icon: "📂" },
     { id: "forms", label: "Forms", icon: "📋" },
     { id: "watermark", label: "Watermark", icon: "💧" },
+    { id: "compress", label: "Compress", icon: "📉" },
   ];
 
   const systemTools: { id: ToolId; label: string; icon: string }[] = [

@@ -8,6 +8,9 @@ Pinnacle comes with a wide range of features to help you manage your PDF documen
 - **Annotation Engine**: Add comments, highlights, and drawings to your documents.
 - **Data Extraction**: Extract text, images, and tables with high precision.
 - **Document Organization**: Split, merge, and reorder pages effortlessly.
+- **AI Refactor**: Use local AI to rewrite and improve text blocks directly within your PDFs.
+- **Form Builder**: Create interactive forms with text fields and checkboxes using manual or AI-assisted placement.
+- **Image & Word Export**: Convert PDFs to high-resolution images or Microsoft Word (.docx) documents.
 - **Knowledge Graph**: Visualize relationships between different parts of your documents.
 - **Security & Privacy**: Sanitize documents, add watermarks, and manage digital signatures.
 

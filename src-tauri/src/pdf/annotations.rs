@@ -204,9 +204,29 @@ pub fn add_annotation(
                 "F" => 4_i64,
             }
         }
+        "square" | "rectangle" => {
+            dictionary! {
+                "Type" => "Annot",
+                "Subtype" => "Square",
+                "Rect" => rect_obj.clone(),
+                "C" => color_array(color),
+                "F" => 4_i64,
+                "BS" => dictionary! { "W" => 2_i64 }, // Border style width 2
+            }
+        }
+        "circle" | "oval" => {
+            dictionary! {
+                "Type" => "Annot",
+                "Subtype" => "Circle",
+                "Rect" => rect_obj.clone(),
+                "C" => color_array(color),
+                "F" => 4_i64,
+                "BS" => dictionary! { "W" => 2_i64 },
+            }
+        }
         _ => {
             return Err(format!(
-                "Unsupported annotation type '{}'. Allowed: highlight, underline, strikeout, note, redact",
+                "Unsupported annotation type '{}'. Allowed: highlight, underline, strikeout, note, redact, square, circle",
                 kind
             ))
         }
@@ -239,6 +259,71 @@ pub fn add_annotation(
     doc.save(output_path)
         .map_err(|e| format!("Failed to save annotated PDF to '{}': {}", output_path, e))?;
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn add_ink_annotation(
+    path: &str,
+    page: u32,
+    gestures: Vec<Vec<[f32; 2]>>,
+    color: Option<[f32; 3]>,
+    width: Option<f32>,
+    output_path: &str,
+) -> Result<(), String> {
+    if page == 0 {
+        return Err("Page number must be 1-based.".to_string());
+    }
+    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
+    let pages = doc.get_pages();
+    let page_id = *pages.get(&page).ok_or("Page not found")?;
+
+    let mut min_x = f32::MAX;
+    let mut min_y = f32::MAX;
+    let mut max_x = f32::MIN;
+    let mut max_y = f32::MIN;
+
+    let mut ink_list = Vec::new();
+    for gesture in gestures {
+        let mut path_points = Vec::new();
+        for [x, y] in gesture {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+            path_points.push(x.into());
+            path_points.push(y.into());
+        }
+        ink_list.push(Object::Array(path_points));
+    }
+
+    let rect = Object::Array(vec![min_x.into(), min_y.into(), max_x.into(), max_y.into()]);
+    
+    let annot_dict = dictionary! {
+        "Type" => "Annot",
+        "Subtype" => "Ink",
+        "Rect" => rect,
+        "InkList" => Object::Array(ink_list),
+        "C" => color_array(color),
+        "F" => 4_i64,
+        "BS" => dictionary! { "W" => width.unwrap_or(2.0) as i64 },
+    };
+
+    let annot_id = doc.add_object(Object::Dictionary(annot_dict));
+
+    if let Ok(page_obj) = doc.get_object_mut(page_id) {
+        if let Ok(page_dict) = page_obj.as_dict_mut() {
+            if let Ok(annots) = page_dict.get_mut(b"Annots") {
+                if let Ok(arr) = annots.as_array_mut() {
+                    arr.push(Object::Reference(annot_id));
+                }
+            } else {
+                page_dict.set("Annots", Object::Array(vec![Object::Reference(annot_id)]));
+            }
+        }
+    }
+
+    doc.save(output_path).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -326,6 +411,50 @@ mod tests {
             annot_dict.get(b"Subtype").unwrap().as_name_str().unwrap(),
             "Highlight"
         );
+    }
+
+    #[test]
+    fn test_add_square_annotation() {
+        let (test_dir, output_dir) = crate::pdf::test_utils::setup_unique_paths("square");
+        let input = test_dir.join("input.pdf");
+        let output = output_dir.join("output.pdf");
+        create_minimal_pdf(input.to_str().unwrap(), 1, "Square").unwrap();
+
+        let result = add_annotation(
+            input.to_str().unwrap(),
+            1,
+            [100.0, 100.0, 200.0, 200.0],
+            "square".to_string(),
+            None,
+            None,
+            output.to_str().unwrap(),
+        );
+        assert!(result.is_ok());
+        crate::pdf::test_utils::teardown_unique_paths(&test_dir, &output_dir);
+    }
+
+    #[test]
+    fn test_add_ink_annotation_success() {
+        let (test_dir, output_dir) = crate::pdf::test_utils::setup_unique_paths("ink");
+        let input = test_dir.join("input.pdf");
+        let output = output_dir.join("output.pdf");
+        create_minimal_pdf(input.to_str().unwrap(), 1, "Ink").unwrap();
+
+        let gestures = vec![
+            vec![[10.0, 10.0], [20.0, 20.0], [30.0, 10.0]],
+            vec![[50.0, 50.0], [60.0, 60.0]]
+        ];
+
+        let result = add_ink_annotation(
+            input.to_str().unwrap(),
+            1,
+            gestures,
+            Some([1.0, 0.0, 0.0]),
+            Some(3.0),
+            output.to_str().unwrap(),
+        );
+        assert!(result.is_ok());
+        crate::pdf::test_utils::teardown_unique_paths(&test_dir, &output_dir);
     }
 
     #[test]

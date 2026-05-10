@@ -980,6 +980,28 @@
      >
        📝 Save Note
      </button>
+     <button 
+      onclick={async () => {
+        if (!selectionState) return;
+        const originalText = selectionState.text;
+        appState.startLoading("AI is refactoring...");
+        try {
+          const system = "Rewrite this text to be more professional. Return ONLY the rewritten text.";
+          const rewritten = await chatState.runAiTask(system, originalText);
+          
+          const outputPath = await invoke<string | null>("save_file_dialog", { defaultPath: "refactored.pdf" });
+          if (outputPath) {
+            await invoke("replace_text_block", { path: filePath, pageNum: pageNumber, oldText: originalText, newText: rewritten, outputPath });
+            appState.showStatus("Text refactored successfully.", false, outputPath);
+            await invoke("shell_open", { filePath: outputPath });
+          }
+        } catch (e) { appState.showStatus(`Refactor failed: ${e}`, true); }
+        finally { selectionState = null; window.getSelection()?.removeAllRanges(); }
+      }}
+      class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded-full shadow-2xl font-black text-[9px] uppercase tracking-widest hover:scale-105 transition-all border border-white/20"
+     >
+       ✍️ AI Refactor
+     </button>
   </div>
 {/if}
 

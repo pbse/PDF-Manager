@@ -125,12 +125,40 @@ pub fn encrypt_pdf(_path: &str, _user_password: &str, _owner_password: &str, _ou
 }
 
 #[tauri::command]
-pub fn compress_pdf(path: &str, output_path: &str) -> Result<(), String> {
+pub fn compress_pdf(path: &str, output_path: &str, preset: &str) -> Result<(), String> {
     let mut doc = Document::load(path).map_err(|e| format!("Failed to load PDF: {}", e))?;
     
-    // Simple compression: remove unused objects and compress streams
-    doc.prune_objects();
-    doc.compress();
+    match preset.to_lowercase().as_str() {
+        "web" => {
+            // High compression: compress streams and prune unused objects
+            doc.prune_objects();
+            doc.compress();
+        }
+        "print" => {
+            // Lossless: only prune unused objects, no re-compression of streams
+            doc.prune_objects();
+        }
+        "min" | "minimal" => {
+            // Extreme: prune, compress, and remove non-essential document metadata
+            doc.prune_objects();
+            doc.compress();
+            
+            // Remove Metadata from Root
+            if let Ok(root_id) = doc.trailer.get(b"Root").and_then(|obj| obj.as_reference()) {
+                if let Ok(mut root) = doc.get_object(root_id).and_then(|obj| obj.as_dict()).cloned() {
+                    root.remove(b"Metadata");
+                    root.remove(b"PieceInfo");
+                    doc.objects.insert(root_id, lopdf::Object::Dictionary(root));
+                }
+            }
+            // Remove Info dictionary
+            doc.trailer.remove(b"Info");
+        }
+        _ => {
+            doc.prune_objects();
+            doc.compress();
+        }
+    }
     
     doc.save(output_path).map_err(|e| format!("Failed to save compressed PDF: {}", e))?;
     Ok(())
@@ -171,7 +199,8 @@ mod tests {
 
         let result = compress_pdf(
             input_path.to_str().unwrap(),
-            output_path.to_str().unwrap()
+            output_path.to_str().unwrap(),
+            "web"
         );
 
         assert!(result.is_ok());

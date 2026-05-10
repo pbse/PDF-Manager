@@ -69,6 +69,40 @@
     });
   }
 
+  async function handleBatchPdfToImages() {
+    if (batchExtractFiles.length === 0) return;
+    const baseDir = await invoke<string | null>("save_file_dialog", { defaultPath: "Exported_Images" });
+    if (!baseDir) return;
+
+    isBatchExtracting = true;
+    appState.startLoading("Exporting PDFs to high-res images...");
+    try {
+      for (const file of batchExtractFiles) {
+        const fileName = file.path.split(/[/\\]/).pop() || "doc";
+        const fileOutputDir = `${baseDir}_${fileName.replace(/\.pdf$/i, "")}`;
+        await invoke("pdf_to_images", { path: file.path, outputDir: fileOutputDir, format: "png" });
+      }
+      appState.showStatus("Batch image export completed successfully.", false, baseDir);
+    } catch (e) {
+      appState.showStatus(`Batch export failed: ${e}`, true);
+    } finally {
+      isBatchExtracting = false;
+    }
+  }
+
+  async function handleExportToWord() {
+    if (!pdfState.viewerFilePath) return;
+    const outputPath = await invoke<string | null>("save_file_dialog", { defaultPath: "document.docx" });
+    if (!outputPath) return;
+
+    appState.startLoading("Converting PDF to Word (.docx)...");
+    try {
+      await invoke("pdf_to_docx", { path: pdfState.viewerFilePath, outputPath });
+      appState.showStatus("Word document exported successfully.", false, outputPath);
+      await invoke("shell_open", { filePath: outputPath });
+    } catch (e) { appState.showStatus(`Word export failed: ${e}`, true); }
+  }
+
   async function handleResearchReport() {
     if (!pdfState.viewerFilePath) return;
     appState.startLoading("Compiling research report...");
@@ -204,6 +238,9 @@
                   <button onclick={handleBatchExtract} disabled={isBatchExtracting} class="w-full py-2.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20">
                     {batchExtractFiles.length === 0 ? 'Select Files' : isBatchExtracting ? 'Extracting...' : 'Run Intelligence Batch'}
                   </button>
+                  <button onclick={handleBatchPdfToImages} disabled={isBatchExtracting} class="w-full py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:border-blue-500 transition-colors">
+                    Export as High-Res Images
+                  </button>
                   {#if batchExtractResults.length > 0}
                     <button onclick={exportBatchToCsv} class="w-full py-2 border-2 border-green-500 text-green-600 font-black text-[10px] uppercase tracking-widest rounded-xl">Download CSV Results</button>
                   {/if}
@@ -221,6 +258,10 @@
                 <button onclick={() => !pdfState.viewerFilePath ? pdfState.selectFile('extract') : (pdfState.ocrTrigger = Date.now())} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
                   <div class="text-lg mb-1 group-hover:scale-110 transition-transform">👁️</div>
                   <div class="text-[9px] font-black uppercase text-slate-500">{!pdfState.viewerFilePath ? 'Select PDF' : 'Force OCR'}</div>
+                </button>
+                <button onclick={handleExportToWord} class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-all text-left group">
+                  <div class="text-lg mb-1 group-hover:scale-110 transition-transform">📝</div>
+                  <div class="text-[9px] font-black uppercase text-slate-500">Export Word</div>
                 </button>
             </div>
           </section>

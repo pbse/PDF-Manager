@@ -32,10 +32,24 @@ Professional document management requires trust and security:
 ## 📝 Annotation & Markup
 
 Pinnacle's annotation engine is built for deep research:
-- **Highlighters:** Color-code your findings across different documents.
+- **AI Refactor:** Select any text block and have local AI rewrite it to be more professional or concise. Changes are applied directly to the PDF stream.
+- **Markup Tools:** Beyond highlights, use **Square**, **Circle**, and **Freehand Ink** tools for detailed document review.
 - **Comments:** Add sticky notes and threaded comments directly on the page.
-- **Freehand Drawing:** Use pen tools for quick sketches or margin notes.
 - **Extraction:** Quickly copy text or images from the viewer into your research notepad.
+
+## 📋 Interactive Forms
+
+Pinnacle goes beyond simple filling with a complete form toolkit:
+- **Form Builder:** Add new text fields, checkboxes, and dropdowns to static PDFs using a drag-and-drop interface.
+- **AI Detection:** Let the AI scan your document to suggest where interactive fields should be placed based on visual lines and boxes.
+- **Intelligent Filling:** Automatically fill forms based on your local user profile and document history.
+
+## 📉 Optimization & Export
+
+Prepare your documents for any platform:
+- **Compression Presets:** Choose from **Web Optimized**, **Print Ready**, or **Minimal Size** presets to reduce file size while maintaining necessary quality.
+- **Image Export:** Batch convert PDF pages into high-resolution PNG or JPG images.
+- **Word Export (.docx):** Export your PDFs to Microsoft Word format with layout analysis to preserve paragraphs and basic structure.
 
 ## 🔄 Version Control
 
