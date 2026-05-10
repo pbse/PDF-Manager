@@ -30,6 +30,10 @@ src/ui/.svelte-kit/
 # Gemini Instructions
 GEMINI.md
 
+# VitePress
+docs/.vitepress/dist
+docs/.vitepress/cache
+
 # test results
 test-results/
 src/ui/test-results/
