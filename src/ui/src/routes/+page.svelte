@@ -29,6 +29,7 @@
   import VersionsPane from "$lib/components/VersionsPane.svelte";
   import WatermarkPane from "$lib/components/WatermarkPane.svelte";
   import NotepadPane from "$lib/components/NotepadPane.svelte";
+  import InsightPane from "$lib/components/InsightPane.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
   import OnboardingTour from "$lib/components/OnboardingTour.svelte";
@@ -45,11 +46,12 @@
   let compareMode = $state<"side-by-side" | "overlay">("side-by-side");
   let overlaySliderPos = $state(50); // percentage
   
-  const intelligenceTools = ['extract', 'compare', 'notepad', 'library', 'versions', 'settings'];
+  const intelligenceTools = ['extract', 'compare', 'notepad', 'library', 'versions', 'settings', 'insights'];
   const operationTools = ['merge', 'split', 'annotate', 'signature', 'security', 'organize', 'forms', 'watermark'];
 
   const toolPanes: Record<string, any> = {
     extract: ExtractPane,
+    insights: InsightPane,
     settings: SettingsPane,
     compare: ComparePane,
     library: LibraryPane,
@@ -136,6 +138,9 @@
 
   $effect(() => {
     if (pdfState.viewerFilePath) {
+      if (pdfState.activeTool === 'peek' || pdfState.activeTool === 'library') {
+        pdfState.activeTool = 'insights';
+      }
       chatState.nameDocument(pdfState.viewerFilePath)
         .then(s => aiSummary = s)
         .catch(e => console.error(e));
@@ -412,8 +417,9 @@
              </p>
              
              <div class="flex flex-wrap justify-center gap-4">
-               <button onclick={() => pdfState.switchTool('extract')} class="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-xs font-black uppercase tracking-widest text-blue-600">Start with Assistant</button>
-               <button onclick={() => pdfState.switchTool('library')} class="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Browse Library</button>
+               <button onclick={() => pdfState.openNewDocument()} class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 transition-all text-sm font-black uppercase tracking-widest">Open a Document</button>
+               <button onclick={() => pdfState.switchTool('extract')} class="px-6 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Start with Assistant</button>
+               <button onclick={() => pdfState.switchTool('library')} class="px-6 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Browse Library</button>
              </div>
           </div>
           
@@ -486,11 +492,11 @@
   @reference "tailwindcss";
 
   :global(.viewer-container) {
-    @apply shadow-2xl rounded-2xl overflow-hidden border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors duration-300;
+    @apply shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors duration-300;
   }
   
   :global(.canvas-wrapper) {
-    @apply rounded-xl;
+    @apply rounded-2xl;
   }
 
   :global(.viewer-controls) {

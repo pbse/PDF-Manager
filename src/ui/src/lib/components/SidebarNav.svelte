@@ -1,8 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { pdfState, type ToolId } from "$lib/state/pdfState.svelte";
+  import { chatState } from "$lib/state/chatState.svelte";
+  import { onMount } from "svelte";
 
   const intelligenceTools: { id: ToolId; label: string; icon: string }[] = [
+    { id: "insights", label: "Insights", icon: "💡" },
     { id: "extract", label: "Assistant", icon: "✨" },
     { id: "compare", label: "Compare", icon: "⚖️" },
     { id: "notepad", label: "Notepad", icon: "📝" },
@@ -25,15 +28,25 @@
   ];
 
   let isCollapsed = $state(false);
+
+  onMount(() => {
+    chatState.checkOllama();
+  });
 </script>
 
 <nav class="flex flex-col items-center py-6 border-r border-slate-200 dark:border-slate-800 transition-all duration-500 bg-white dark:bg-slate-950 {isCollapsed ? 'w-16' : 'w-20'} shadow-xl z-50">
-  <button 
-    onclick={() => isCollapsed = !isCollapsed}
-    class="mb-8 font-black text-blue-600 dark:text-blue-400 text-2xl tracking-tighter hover:scale-110 transition-transform flex items-center justify-center w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl"
-  >
-    {isCollapsed ? 'P' : 'Pi'}
-  </button>
+  <div class="relative mb-8">
+    <button 
+      onclick={() => isCollapsed = !isCollapsed}
+      class="font-black text-blue-600 dark:text-blue-400 text-2xl tracking-tighter hover:scale-110 transition-transform flex items-center justify-center w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl"
+    >
+      {isCollapsed ? 'P' : 'Pi'}
+    </button>
+    <div 
+      class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-950 transition-colors {chatState.ollamaStatus === 'connected' ? 'bg-green-500' : chatState.ollamaStatus === 'not_running' ? 'bg-red-500' : 'bg-amber-500'}"
+      title="AI Engine Status: {chatState.ollamaStatus}"
+    ></div>
+  </div>
 
   <div class="flex flex-col gap-6 w-full px-3 overflow-y-auto no-scrollbar pb-8">
     <!-- Intelligence Section -->

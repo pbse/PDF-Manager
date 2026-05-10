@@ -55,7 +55,13 @@
         .on("end", dragended) as any
       )
       .on("click", (e, d: any) => {
-        if (d.type === 'doc') pdfState.openTab(d.id);
+        if (d.type === 'doc') {
+          pdfState.openTab(d.id);
+        } else {
+          // Entity clicked: search library for this entity
+          pdfState.activeTool = 'library';
+          historyState.searchLibrary(d.name);
+        }
       });
 
     node.append("circle")

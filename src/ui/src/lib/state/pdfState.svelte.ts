@@ -3,11 +3,11 @@ import { appState } from "./appState.svelte";
 import { historyState } from "./historyState.svelte";
 import { db, type BookmarkRecord, type VersionRecord, type NoteRecord, type DocumentRecord } from "./db";
 
-export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings";
+export type ToolId = "merge" | "split" | "extract" | "annotate" | "signature" | "security" | "organize" | "compare" | "library" | "forms" | "versions" | "watermark" | "notepad" | "peek" | "settings" | "insights";
 export type SelectionTarget = "parse" | "split" | "rotate" | "delete" | "annotate" | "signature" | "security" | "extract" | "crypto" | "organize";
 
 const state = $state({
-  activeTool: "merge" as ToolId,
+  activeTool: "insights" as ToolId,
   highlightedSnippet: null as string | null,
   bookmarks: [] as BookmarkRecord[],
   versions: [] as VersionRecord[],
@@ -277,6 +277,14 @@ const state = $state({
     const result = await invoke<string[]>("open_file_dialog", { multiple: false });
     if (result && result.length > 0) {
       state.setFileForTarget(target, result[0]);
+    }
+  },
+
+  async openNewDocument() {
+    const result = await invoke<string[]>("open_file_dialog", { multiple: false });
+    if (result && result.length > 0) {
+      state.openTab(result[0]);
+      state.activeTool = 'insights';
     }
   },
 
