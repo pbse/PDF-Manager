@@ -31,7 +31,14 @@ export default defineConfig({
         text: 'Core Concepts',
         items: [
           { text: 'Local-First Architecture', link: '/guide/local-first' },
+          { text: 'AI & Ollama', link: '/guide/ai-ollama' },
           { text: 'Knowledge Graph', link: '/guide/knowledge-graph' }
+        ]
+      },
+      {
+        text: 'Tools & Features',
+        items: [
+          { text: 'PDF Manipulation', link: '/guide/pdf-tools' }
         ]
       }
     ],

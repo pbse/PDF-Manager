@@ -10,6 +10,11 @@ When you have hundreds of PDFs—research papers, legal cases, or financial reco
 
 Pinnacle automatically builds a **Knowledge Graph** as you import and read documents.
 
+<div class="screenshot-placeholder">
+  <span>📸 Knowledge Graph Screenshot Needed</span>
+  Save as <code>docs/public/screenshots/knowledge-graph.png</code>
+</div>
+
 - **Entity Extraction:** Pinnacle scans your documents for key entities like Organizations, Dates, People, and Amounts.
 - **Visual Mapping:** You can open the **Knowledge Graph** pane to see a beautiful, interactive D3.js visualization.
 - **Interactive Nodes:**

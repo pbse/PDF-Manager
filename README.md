@@ -1,6 +1,10 @@
 # Pinnacle - Local Document Intelligence
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://pbse.github.io/Pinnacle/)
+
 **Pinnacle** is a professional-grade, local-first document intelligence platform designed for privacy-conscious users and enterprises. Built with Rust and Tauri, it provides exceptional performance for complex PDF operations without ever letting your data leave your device.
+
+Read the full documentation at [pbse.github.io/Pinnacle](https://pbse.github.io/Pinnacle/).
 
 ## Why Pinnacle?
 - **Privacy First:** All processing happens 100% locally on your machine. No cloud, no tracking.

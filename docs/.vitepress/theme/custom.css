@@ -81,3 +81,43 @@
   border: 2px solid var(--vp-c-text-1) !important;
   box-shadow: 4px 4px 0px var(--vp-c-text-1) !important;
 }
+
+/* Screenshot Placeholders */
+.screenshot-placeholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #f1f5f9;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  margin: 20px 0;
+  font-family: var(--vp-font-family-base);
+  text-align: center;
+  padding: 20px;
+}
+
+.dark .screenshot-placeholder {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.screenshot-placeholder span {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+
+.screenshot-placeholder code {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.dark .screenshot-placeholder code {
+  background: #0f172a;
+  color: #94a3b8;
+}
