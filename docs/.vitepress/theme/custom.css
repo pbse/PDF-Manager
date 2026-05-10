@@ -1,0 +1,83 @@
+/**
+ * Pinnacle Custom Theme
+ * Neubrutalist & Glassmorphism blend
+ */
+
+ :root {
+  --vp-c-brand-1: #3b82f6; /* Blue 500 */
+  --vp-c-brand-2: #8b5cf6; /* Purple 500 */
+  --vp-c-brand-3: #2563eb; /* Blue 600 */
+  
+  --vp-button-brand-border: #1e40af;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-bg: #3b82f6;
+  --vp-button-brand-hover-border: #1e3a8a;
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-hover-bg: #2563eb;
+  --vp-button-brand-active-border: #1e3a8a;
+  --vp-button-brand-active-text: #ffffff;
+  --vp-button-brand-active-bg: #1d4ed8;
+}
+
+/* Feature Boxes - Neubrutalist */
+.VPFeature {
+  border: 2px solid var(--vp-c-divider) !important;
+  border-radius: 16px !important;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.05) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.dark .VPFeature {
+  background: rgba(30, 41, 59, 0.6) !important;
+  box-shadow: 4px 4px 0px rgba(255,255,255,0.05) !important;
+}
+
+.VPFeature:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 8px 8px 0px rgba(59, 130, 246, 0.2) !important;
+  border-color: var(--vp-c-brand-1) !important;
+}
+
+.dark .VPFeature:hover {
+  box-shadow: 8px 8px 0px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Primary Button Neubrutalism */
+.VPButton.brand {
+  border: 2px solid #1e40af !important;
+  box-shadow: 4px 4px 0px #1e40af !important;
+  border-radius: 12px !important;
+  transition: all 0.2s ease;
+}
+.VPButton.brand:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #1e40af !important;
+}
+
+.dark .VPButton.brand {
+  border: 2px solid #60a5fa !important;
+  box-shadow: 4px 4px 0px #60a5fa !important;
+}
+.dark .VPButton.brand:hover {
+  box-shadow: 2px 2px 0px #60a5fa !important;
+}
+
+/* Secondary Button */
+.VPButton.alt {
+  border: 2px solid var(--vp-c-text-1) !important;
+  box-shadow: 4px 4px 0px var(--vp-c-text-1) !important;
+  border-radius: 12px !important;
+  transition: all 0.2s ease;
+}
+.VPButton.alt:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--vp-c-text-1) !important;
+}
+
+.dark .VPButton.alt {
+  border: 2px solid var(--vp-c-text-1) !important;
+  box-shadow: 4px 4px 0px var(--vp-c-text-1) !important;
+}
