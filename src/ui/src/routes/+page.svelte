@@ -505,7 +505,7 @@
   </div>
 {/if}
 
-<style>
+<style lang="postcss">
   @reference "tailwindcss";
 
   :global(.viewer-container) {

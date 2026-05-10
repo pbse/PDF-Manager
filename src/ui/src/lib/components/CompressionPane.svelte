@@ -52,7 +52,7 @@
     </div>
 
     <div class="space-y-3">
-      <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Optimization Preset</label>
+      <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Optimization Preset</span>
       
       {#each presets as preset}
         <button 

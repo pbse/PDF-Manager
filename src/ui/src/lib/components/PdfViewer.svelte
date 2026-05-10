@@ -18,6 +18,7 @@
     ocrTrigger = 0,
     entityMappingTrigger = { dates: [], amounts: [], orgs: [] },
     highlightedSnippet = null,
+    formFields = [],
     onselect,
     onclear,
     onclose,
@@ -876,7 +877,7 @@
 
         <!-- Form Field Overlays (Builder Mode Indicators) -->
         {#if formFields}
-          {#each formFields.filter(f => f.page === pageNumber) as field}
+          {#each formFields.filter((f: { page: number }) => f.page === pageNumber) as field}
             {@const [vx1, vy1] = viewport.convertToViewportPoint(field.rect[0], field.rect[1])}
             {@const [vx2, vy2] = viewport.convertToViewportPoint(field.rect[2], field.rect[3])}
             <g class="form-field-indicator group/field">
