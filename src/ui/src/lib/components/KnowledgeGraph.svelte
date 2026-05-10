@@ -3,6 +3,7 @@
   import * as d3 from "d3";
   import { db } from "$lib/state/db";
   import { pdfState } from "$lib/state/pdfState.svelte";
+  import { historyState } from "$lib/state/historyState.svelte";
 
   let svg: SVGSVGElement | undefined = $state();
   let width = $state(400);
