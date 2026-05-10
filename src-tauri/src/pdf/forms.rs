@@ -5,12 +5,19 @@ pub struct FormField {
     pub name: String,
     pub field_type: String,
     pub value: String,
+    pub page: u32,
+    pub rect: Vec<f32>,
 }
 
 #[tauri::command]
 pub fn get_form_fields(path: &str) -> Result<Vec<FormField>, String> {
     let doc = Document::load(path).map_err(|e| e.to_string())?;
     let mut fields = vec![];
+    let pages = doc.get_pages();
+    let mut page_id_to_num = std::collections::HashMap::new();
+    for (num, id) in &pages {
+        page_id_to_num.insert(*id, *num);
+    }
 
     if let Ok(Object::Reference(root_id)) = doc.trailer.get(b"Root") {
         if let Ok(Object::Dictionary(catalog)) = doc.get_object(*root_id) {
@@ -38,7 +45,21 @@ pub fn get_form_fields(path: &str) -> Result<Vec<FormField>, String> {
                                         "".to_string()
                                     };
 
-                                    fields.push(FormField { name, field_type, value });
+                                    let rect = if let Ok(Object::Array(arr)) = field.get(b"Rect") {
+                                        arr.iter().filter_map(|o| o.as_f32().ok()).collect()
+                                    } else {
+                                        vec![0.0, 0.0, 0.0, 0.0]
+                                    };
+
+                                    let page = if let Ok(Object::Reference(pid)) = field.get(b"P") {
+                                        *page_id_to_num.get(&pid).unwrap_or(&1)
+                                    } else {
+                                        // If P is missing, we'd need to search all pages for this annot
+                                        // For now, default to 1 or try a heuristic
+                                        1
+                                    };
+
+                                    fields.push(FormField { name, field_type, value, page, rect });
                                 }
                             }
                         }

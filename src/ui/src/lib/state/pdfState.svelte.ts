@@ -49,6 +49,8 @@ const state = $state({
   history: [] as any[],
   redoStack: [] as any[],
   comparisonFile2: null as string | null,
+  scannedFields: [] as { name: string, field_type: string, value: string, page: number, rect: number[] }[],
+  formFieldsToCreate: [] as { name: string, field_type: string, page: number, rect: number[] }[],
 
   switchTool(id: ToolId) {
     if (id === state.activeTool) return;
@@ -115,6 +117,10 @@ const state = $state({
 
   openTab(path: string) {
     if (!path) return;
+    if (state.viewerFilePath !== path) {
+      state.scannedFields = [];
+      state.formFieldsToCreate = [];
+    }
     if (!state.openTabs.includes(path)) {
       state.openTabs = [...state.openTabs, path];
     }

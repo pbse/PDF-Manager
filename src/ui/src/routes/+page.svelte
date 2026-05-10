@@ -398,6 +398,7 @@
                 ocrTrigger={pdfState.ocrTrigger}
                 entityMappingTrigger={aiInsights}
                 highlightedSnippet={pdfState.highlightedSnippet}
+                formFields={[...pdfState.scannedFields, ...pdfState.formFieldsToCreate]}
                 onselect={handleViewerSelect}
                 onclear={handleViewerClear}
                 ondone={() => (pdfState.viewerMode = "view")}

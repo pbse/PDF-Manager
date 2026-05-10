@@ -1,0 +1,60 @@
+name: Update Homebrew Cask
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-cask:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Homebrew Tap
+        uses: actions/checkout@v4
+        with:
+          # You need to create a Personal Access Token (PAT) with 'repo' scope
+          # and add it to your repo secrets as HOMEBREW_TAP_TOKEN
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: pbse/homebrew-tap
+          path: homebrew-tap
+
+      - name: Get Release Info
+        id: get_release
+        run: |
+          VERSION=${{ github.event.release.tag_name }}
+          # Remove 'v' prefix if exists
+          VERSION_CLEAN=${VERSION#v}
+          echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+          
+          # Find the DMG asset URL (filtering for aarch64 as an example)
+          # You might want to support both Intel and Apple Silicon in your Cask logic later
+          DMG_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.event.release.tag_name }} \
+            | grep "browser_download_url.*aarch64.dmg" | cut -d '"' -f 4)
+          echo "url=$DMG_URL" >> $GITHUB_OUTPUT
+
+      - name: Calculate SHA256
+        id: shasum
+        run: |
+          curl -L -o app.dmg "${{ steps.get_release.outputs.url }}"
+          SHA256=$(shasum -a 256 app.dmg | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Update Cask File
+        run: |
+          CASK_PATH="homebrew-tap/Casks/pinnacle.rb"
+          VERSION="${{ steps.get_release.outputs.version }}"
+          SHA256="${{ steps.shasum.outputs.sha256 }}"
+          URL="${{ steps.get_release.outputs.url }}"
+          
+          # Using sed to update the version and sha256 in the Ruby file
+          sed -i '' "s/version \".*\"/version \"$VERSION\"/" $CASK_PATH
+          sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" $CASK_PATH
+          # If the URL structure changes, you can also update it via sed
+          
+      - name: Commit and Push
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/pinnacle.rb
+          git commit -m "Update Pinnacle to v${{ steps.get_release.outputs.version }}"
+          git push

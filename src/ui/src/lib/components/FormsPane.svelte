@@ -4,9 +4,7 @@
   import { appState } from "$lib/state/appState.svelte";
   import ToolPane from "./ToolPane.svelte";
 
-  let fields = $state<{ name: string, field_type: string, value: string }[]>([]);
   let fieldUpdates = $state<Record<string, string>>({});
-  let createdFields = $state<{ name: string, field_type: string, page: number, rect: number[] }[]>([]);
   let isScanning = $state(false);
   let isBuilderMode = $state(false);
   let newFieldName = $state("");
@@ -16,10 +14,10 @@
     if (!pdfState.viewerFilePath) return;
     isScanning = true;
     try {
-      fields = await invoke("get_form_fields", { path: pdfState.viewerFilePath });
+      pdfState.scannedFields = await invoke("get_form_fields", { path: pdfState.viewerFilePath });
       fieldUpdates = {};
-      fields.forEach(f => fieldUpdates[f.name] = f.value);
-      if (fields.length === 0) appState.showStatus("No interactive fields found. Try Builder Mode to add some!", false);
+      pdfState.scannedFields.forEach(f => fieldUpdates[f.name] = f.value);
+      if (pdfState.scannedFields.length === 0) appState.showStatus("No interactive fields found. Try Builder Mode to add some!", false);
     } catch (e) {
       appState.showStatus(`Scan failed: ${e}`, true);
     } finally {
@@ -44,8 +42,8 @@
       return;
     }
     const rect = pdfState.annotationRectInput.split(",").map(Number);
-    createdFields = [...createdFields, {
-      name: newFieldName || `Field_${createdFields.length + 1}`,
+    pdfState.formFieldsToCreate = [...pdfState.formFieldsToCreate, {
+      name: newFieldName || `Field_${pdfState.formFieldsToCreate.length + 1}`,
       field_type: newFieldType,
       page: pdfState.viewerPageNumber,
       rect
@@ -65,10 +63,10 @@
       let currentPath = pdfState.viewerFilePath;
 
       // 1. If we have created fields, apply them first
-      if (createdFields.length > 0) {
+      if (pdfState.formFieldsToCreate.length > 0) {
         await invoke("create_form_fields", {
           path: currentPath,
-          newFields: createdFields,
+          newFields: pdfState.formFieldsToCreate,
           outputPath
         });
         currentPath = outputPath;
@@ -84,7 +82,7 @@
       }
 
       appState.showStatus("Form saved successfully.", false, outputPath);
-      createdFields = [];
+      pdfState.formFieldsToCreate = [];
       isBuilderMode = false;
       await invoke("shell_open", { filePath: outputPath });
     } catch (e) {
@@ -179,14 +177,14 @@
           </div>
         </div>
 
-        {#if createdFields.length > 0}
+        {#if pdfState.formFieldsToCreate.length > 0}
           <div class="pt-4 border-t border-blue-100 dark:border-blue-900/30">
-            <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">To be created ({createdFields.length})</div>
+            <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">To be created ({pdfState.formFieldsToCreate.length})</div>
             <div class="max-h-32 overflow-y-auto space-y-2">
-              {#each createdFields as cf, i}
+              {#each pdfState.formFieldsToCreate as cf, i}
                 <div class="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700">
                   <span class="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{cf.name}</span>
-                  <button onclick={() => createdFields = createdFields.filter((_, idx) => idx !== i)} class="text-red-500 text-[10px]">✕</button>
+                  <button onclick={() => pdfState.formFieldsToCreate = pdfState.formFieldsToCreate.filter((_, idx) => idx !== i)} class="text-red-500 text-[10px]">✕</button>
                 </div>
               {/each}
             </div>
@@ -195,16 +193,16 @@
       </div>
     {/if}
 
-    {#if fields.length > 0 || createdFields.length > 0}
+    {#if pdfState.scannedFields.length > 0 || pdfState.formFieldsToCreate.length > 0}
       <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-900">
         <div class="flex justify-between items-center">
-          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fields Found ({fields.length})</h3>
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fields Found ({pdfState.scannedFields.length})</h3>
           <button onclick={() => appState.showStatus("Auto-filling based on profile...", false)} class="text-[8px] font-black text-blue-500 uppercase tracking-tighter">✨ AI Fill</button>
         </div>
 
-        {#if fields.length > 0}
+        {#if pdfState.scannedFields.length > 0}
           <div class="max-h-96 overflow-y-auto space-y-3 pr-1">
-            {#each fields as field}
+            {#each pdfState.scannedFields as field}
               <div class="space-y-1">
                 <label for="field-{field.name}" class="text-[9px] font-bold text-slate-500 uppercase truncate block">{field.name}</label>
                 {#if field.field_type === 'Btn'}

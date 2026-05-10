@@ -35,6 +35,7 @@
     ocrTrigger?: number;
     entityMappingTrigger?: { dates: string[], amounts: string[], orgs: string[] };
     highlightedSnippet?: string | null;
+    formFields?: { name: string, field_type: string, page: number, rect: number[] }[];
     onselect?: (event: any) => void;
 
     onclear?: () => void;
@@ -872,6 +873,56 @@
              class="animate-pulse"
            />
         {/each}
+
+        <!-- Form Field Overlays (Builder Mode Indicators) -->
+        {#if formFields}
+          {#each formFields.filter(f => f.page === pageNumber) as field}
+            {@const [vx1, vy1] = viewport.convertToViewportPoint(field.rect[0], field.rect[1])}
+            {@const [vx2, vy2] = viewport.convertToViewportPoint(field.rect[2], field.rect[3])}
+            <g class="form-field-indicator group/field">
+              <!-- Shadow/Offset for Neubrutalist look -->
+              <rect 
+                x={Math.min(vx1, vx2) + 2} 
+                y={Math.min(vy1, vy2) + 2} 
+                width={Math.abs(vx2 - vx1)} 
+                height={Math.abs(vy2 - vy1)} 
+                fill="rgba(0, 0, 0, 0.1)"
+                rx="1"
+              />
+              <!-- Main Box -->
+              <rect 
+                x={Math.min(vx1, vx2)} 
+                y={Math.min(vy1, vy2)} 
+                width={Math.abs(vx2 - vx1)} 
+                height={Math.abs(vy2 - vy1)} 
+                fill={field.field_type === 'Btn' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(59, 130, 246, 0.05)'} 
+                stroke="#0f172a"
+                stroke-width="1.5"
+                rx="1"
+                class="transition-all duration-200 group-hover/field:fill-white dark:group-hover/field:fill-slate-800"
+              />
+              <!-- Label Badge -->
+              <g transform="translate({Math.min(vx1, vx2)}, {Math.min(vy1, vy2) - 14})">
+                <rect 
+                  x="0" y="0" 
+                  width={field.name.length * 5 + 35} 
+                  height="12" 
+                  fill="#0f172a" 
+                  rx="2"
+                />
+                <text 
+                  x="4" y="9" 
+                  font-size="7" 
+                  font-weight="bold" 
+                  fill="white" 
+                  class="uppercase tracking-widest"
+                >
+                  {field.name} • {field.field_type === 'Tx' ? 'Text' : field.field_type === 'Btn' ? 'Check' : 'Choice'}
+                </text>
+              </g>
+            </g>
+          {/each}
+        {/if}
 
         <!-- Laser Pointer -->
         {#if isLaserActive}
