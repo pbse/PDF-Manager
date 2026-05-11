@@ -50,7 +50,7 @@ pub use convert::write_text_file;
 pub use rasterizer::pdf_to_images;
 pub use annotations::{add_annotation, add_ink_annotation, delete_annotation, update_annotation_contents};
 pub use reorder::reorder_pages;
-pub use security_utils::{compress_pdf, decrypt_pdf, flatten_annotations};
+pub use security_utils::{compress_pdf, decrypt_pdf, encrypt_pdf, flatten_annotations};
 pub use compare::compare_pdfs_text;
 pub use outline::{get_pdf_outline, set_pdf_outline};
 pub use annotation_reader::get_annotations;
